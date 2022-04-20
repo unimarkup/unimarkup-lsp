@@ -1,0 +1,49 @@
+// A launch configuration that compiles the extension and then opens it inside a new window
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Launch Client",
+			"type": "extensionHost",
+			"request": "launch",
+			"runtimeExecutable": "${execPath}",
+			"args": [
+				"--disable-extensions",
+				"--extensionDevelopmentPath=${workspaceRoot}/vscode"
+			],
+			"outFiles": ["${workspaceRoot}/vscode/out/**/*.js"],
+			"preLaunchTask": "Build Extension",
+			"skipFiles": [
+        "<node_internals>/**/*.js"
+      ]
+		},
+		{
+			"name": "Attach To Server",
+      "type": "lldb",
+      "request": "attach",
+      "program": "${workspaceFolder}/server/target/debug/unimarkup_ls",
+      "pid": "${command:pickMyProcess}",
+      "sourceLanguages": [
+        "rust"
+      ]
+		},
+		{
+			"name": "Language Server E2E Test",
+			"type": "extensionHost",
+			"request": "launch",
+			"runtimeExecutable": "${execPath}",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceRoot}/vscode",
+				"--extensionTestsPath=${workspaceRoot}/vscode/out/test/index",
+				"${workspaceRoot}/vscode/testFixture"
+			],
+			"outFiles": ["${workspaceRoot}/vscode/out/test/**/*.js"]
+		}
+	],
+	"compounds": [
+		{
+			"name": "Client + Server",
+			"configurations": ["Launch Client", "Attach To Server"]
+		}
+	]
+}

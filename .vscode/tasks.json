@@ -1,0 +1,47 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Build Extension",
+			"type": "npm",
+			"script": "compile",
+			"path": "vscode",
+			"group": "build",
+			"options": {
+				"cwd": "${workspaceFolder}/vscode/"
+			},
+			"problemMatcher": {
+				"base": "$tsc",
+				"fileLocation": ["relative", "${workspaceFolder}"]
+			}
+		},
+		{
+			"label": "Build Extension in Background",
+			"type": "npm",
+			"script": "watch",
+			"isBackground": true,
+			"path": "vscode",
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"options": {
+				"cwd": "${workspaceFolder}/vscode/"
+			},
+			"problemMatcher": {
+				"base": "$tsc-watch",
+				"fileLocation": ["relative", "${workspaceFolder}"]
+			}
+		},
+    {
+      "label": "Build Server",
+      "group": "build",
+      "type": "shell",
+			"options": {
+				"cwd": "${workspaceFolder}/server/"
+			},
+      "command": "cargo build --package unimarkup_ls",
+      "problemMatcher": "$rustc"
+    }
+	]
+}
