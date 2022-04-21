@@ -31,7 +31,6 @@ fn main_loop(
     params: serde_json::Value,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     let _params: InitializeParams = serde_json::from_value(params).unwrap();
-    eprintln!("{:#?}",_params.capabilities.text_document.unwrap().semantic_tokens.unwrap().token_types);
 
     let (tx_um, rx_um) = mpsc::channel::<UnimarkupDocument>();
     let (tx_doc_open, rx_doc_open) = mpsc::channel::<DidOpenTextDocumentParams>();
@@ -93,9 +92,13 @@ fn main_loop(
         // Check if doc-change thread sent updates
         if let Ok(um) = rx_um.try_recv() {
             update_cnt += 1;
-            let result = Some(LogMessageParams{ typ: MessageType::INFO, message: um.html().body() });
-            let result = serde_json::to_value(&result).unwrap();
-            let resp = lsp_server::Notification { method: LogMessage::METHOD.to_string(), params: result };
+            // let result = Some(LogMessageParams{ typ: MessageType::INFO, message: um.html().body() });
+            // let result = serde_json::to_value(&result).unwrap();
+            // let resp = lsp_server::Notification { method: LogMessage::METHOD.to_string(), params: result };
+            let resp = lsp_server::Notification{
+                method: "extension/renderedContent".to_string(),
+                params: serde_json::to_value(um.html().body()).unwrap(),
+            };
             connection.sender.send(Message::Notification(resp))?;
             //Note: Instead of LogMessage, the actual uri to the renderedFile could be sent and ShowDocument set
 

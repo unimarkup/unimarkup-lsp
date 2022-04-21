@@ -56,7 +56,14 @@
           "description": "Traces the communication between VS Code and the language server."
         }
       }
-    }
+    },
+    "commands": [
+      {
+				"command": "um.preview",
+				"title": "Show side preview",
+				"category": "Unimarkup"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",

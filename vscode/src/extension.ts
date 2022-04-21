@@ -1,21 +1,18 @@
-import * as path from 'path';
-import { workspace, ExtensionContext, window } from 'vscode';
+import { ExtensionContext, window, commands, WebviewPanel } from 'vscode';
 
 import {
   LanguageClient,
   LanguageClientOptions,
+  NotificationType,
   ServerOptions
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
+let renderedContent: string = "";
 
 export function activate(context: ExtensionContext) {
 	let serverPath = "..\\server\\target\\debug\\unimarkup_ls.exe";
   serverPath = context.asAbsolutePath(serverPath);
-
-  // The debug options for the server
-  // --inspect=6009: runs the server in Node's Inspector mode so VS Code can attach to the server for debugging
-  //let debugOptions = { execArgv: ['--nolazy', '--inspect=6009'] };
 
   let serverOptions: ServerOptions = {
     run: { command: serverPath },
@@ -31,10 +28,6 @@ export function activate(context: ExtensionContext) {
   let clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: 'file', language: 'unimarkup' }],
 		traceOutputChannel
-    // synchronize: {
-    //   // Notify the server about file changes to '.clientrc files contained in the workspace
-    //   fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
-    // }
   };
 
   client = new LanguageClient(
@@ -45,6 +38,23 @@ export function activate(context: ExtensionContext) {
   );
 
   client.start();
+
+  let previewPanel: WebviewPanel;
+
+  client.onReady().then(
+    () => {
+      const disposableSidePreview = commands.registerCommand('um.preview', async () => {
+        previewPanel = await initPreview(context);
+      });
+
+      context.subscriptions.push(disposableSidePreview);
+    }
+  ).then(
+    () => client.onNotification(new NotificationType<string>('extension/renderedContent'), (data: string) => {
+      renderedContent = data;
+      previewPanel.webview.html = renderedContent;
+    })
+  );
 }
 
 export function deactivate(): Thenable<void> | undefined {
@@ -52,4 +62,23 @@ export function deactivate(): Thenable<void> | undefined {
     return undefined;
   }
   return client.stop();
+}
+
+
+async function initPreview(context: ExtensionContext): Promise<WebviewPanel> {
+  const panel = window.createWebviewPanel(
+    'umPreviewer',
+    'Unimarkup Preview',
+    // Open the second column for preview inside editor
+    2,
+    {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: []
+    }
+  );
+
+  panel.webview.html = renderedContent;
+
+  return panel;
 }
