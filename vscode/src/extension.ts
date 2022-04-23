@@ -50,11 +50,16 @@ export function activate(context: ExtensionContext) {
       context.subscriptions.push(disposableSidePreview);
     }
   ).then(
-    () => client.onNotification(new NotificationType<string>('extension/renderedContent'), (data: string) => {
-      renderedContent = data;
+    () => client.onNotification(new NotificationType<RenderedContent>('extension/renderedContent'), (data: RenderedContent) => {
+      renderedContent = data.content;
       previewPanel.webview.html = renderedContent;
     })
   );
+}
+
+interface RenderedContent {
+  id: string,
+  content: string
 }
 
 export function deactivate(): Thenable<void> | undefined {

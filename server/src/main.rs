@@ -1,19 +1,27 @@
+use std::collections::HashMap;
 use unimarkup_core::unimarkup::UnimarkupDocument;
 use std::error::Error;
 use std::sync::mpsc;
 use std::thread;
 
 use lsp_types::request::SemanticTokensFullRequest;
-use lsp_types::{DidChangeTextDocumentParams, LogMessageParams, MessageType, DidOpenTextDocumentParams, SemanticTokensParams};
-use lsp_types::notification::{LogMessage, DidOpenTextDocument};
+use lsp_types::{DidChangeTextDocumentParams, DidOpenTextDocumentParams, SemanticTokensParams};
+use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::{
     request::Request, InitializeParams, notification::{DidChangeTextDocument, Notification},
 };
 use lsp_server::{Connection, Message};
+use serde::Serialize;
 
 mod capabilities;
 mod doc_sync;
 mod semantic_tokens;
+
+#[derive(Debug, Clone, Serialize)]
+struct RenderedContent {
+    id: String,
+    content: String,
+}
 
 fn main() -> Result<(), Box<dyn Error + Sync + Send>> {
     let (connection, io_threads) = Connection::stdio();
@@ -41,7 +49,7 @@ fn main_loop(
         doc_sync::doc_change_loop(tx_um, rx_doc_open, rx_doc_change, rx_shutdown);
     });
 
-    let mut rendered_um: Option<UnimarkupDocument> = None;
+    let mut rendered_documents: HashMap<String, UnimarkupDocument> = HashMap::new();
     let mut update_cnt = 0;
 
     loop {
@@ -56,8 +64,15 @@ fn main_loop(
 
                     match req.method.as_str() {
                         SemanticTokensFullRequest::METHOD => {
+                            let resp;
+
                             if let Ok((id, params)) = req.extract::<SemanticTokensParams>(SemanticTokensFullRequest::METHOD) {
-                                let resp = semantic_tokens::get_semantic_tokens(id, params, &rendered_um);
+                                let file_path = params.text_document.uri.to_file_path().unwrap();
+                                if let Some(rendered_um) = rendered_documents.get(&file_path.to_string_lossy().to_string()) {
+                                    resp = semantic_tokens::get_semantic_tokens(id, params, Some(rendered_um));
+                                } else {
+                                    resp = semantic_tokens::get_semantic_tokens(id, params, None);
+                                }
                                 connection.sender.send(Message::Response(resp))?;
                             }
                         }
@@ -92,15 +107,20 @@ fn main_loop(
         // Check if doc-change thread sent updates
         if let Ok(um) = rx_um.try_recv() {
             update_cnt += 1;
-            // let result = Some(LogMessageParams{ typ: MessageType::INFO, message: um.html().body() });
-            // let result = serde_json::to_value(&result).unwrap();
-            // let resp = lsp_server::Notification { method: LogMessage::METHOD.to_string(), params: result };
+
+            let file_id = um.config.um_file.to_string_lossy().to_string();
+            let rendered_content = RenderedContent {
+                id: file_id.clone(),
+                content: um.html().body(),
+            };
+
+            rendered_documents.insert(file_id, um);
+
             let resp = lsp_server::Notification{
                 method: "extension/renderedContent".to_string(),
-                params: serde_json::to_value(um.html().body()).unwrap(),
+                params: serde_json::to_value(rendered_content).unwrap(),
             };
             connection.sender.send(Message::Notification(resp))?;
-            //Note: Instead of LogMessage, the actual uri to the renderedFile could be sent and ShowDocument set
 
             connection.sender.send(Message::Request(
                 lsp_server::Request{
@@ -109,8 +129,6 @@ fn main_loop(
                     params: serde_json::Value::Null,
                 }
             ))?;
-
-            rendered_um = Some(um);
         }
     }
 }
