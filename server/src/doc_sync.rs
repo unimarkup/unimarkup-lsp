@@ -22,6 +22,10 @@ pub(crate) fn doc_change_loop(tx_um: Sender<UnimarkupDocument>, rx_doc_open: Rec
 			config.um_file = changes.text_document.uri.to_file_path().unwrap();
 			let rendered_doc = unimarkup_core::unimarkup::compile(&changes.content_changes[0].text, config.clone()).unwrap();
 			tx_um.send(rendered_doc).unwrap();
+		} else if let Ok(opened_doc) = rx_doc_open.recv() {
+			config.um_file = opened_doc.text_document.uri.to_file_path().unwrap();
+			let rendered_doc = unimarkup_core::unimarkup::compile(&opened_doc.text_document.text, config.clone()).unwrap();
+			tx_um.send(rendered_doc).unwrap();
 		}
 	}
 }
