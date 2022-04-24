@@ -100,14 +100,19 @@ impl SemanticBlockTokenizer for HeadingBlock {
 		let last_inline = self.content.last().unwrap();
 		let last_pos;
 		match last_inline {
-			InlineKind::Bold(nested)
+			InlineKind::Verbatim(nested)
+			| InlineKind::Bold(nested)
 			| InlineKind::Italic(nested)
 			| InlineKind::BoldItalic(nested) => { last_pos = nested.span.end },
-			InlineKind::Verbatim(flat)
-			| InlineKind::Plain(flat)
+			
+			InlineKind::Plain(flat)
 			| InlineKind::PlainNewLine(flat)
 			| InlineKind::EscapedNewLine(flat)
 			| InlineKind::EscapedSpace(flat) => { last_pos = flat.span.end },
+			
+    	InlineKind::TextGroup(nested, _) => {
+				last_pos = nested.span.end
+			},
 		};
 
 		tokens.push(
