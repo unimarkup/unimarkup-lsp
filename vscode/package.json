@@ -61,9 +61,39 @@
       {
 				"command": "um.preview",
 				"title": "Show side preview",
-				"category": "Unimarkup"
+				"category": "Unimarkup",
+        "icon": {
+          "light": "./assets/preview_icon_for_light.svg",
+          "dark": "./assets/preview_icon_for_dark.svg"
+        }
+      },
+      {
+				"command": "onLanguage:unimarkup",
+				"title": "Show side preview",
+				"category": "Unimarkup",
+        "icon": {
+          "light": "./assets/preview_icon_for_light.svg",
+          "dark": "./assets/preview_icon_for_dark.svg"
+        }
       }
-    ]
+    ],
+    "menus": {
+			"editor/title": [
+				{
+					"command": "um.preview",
+					"when": "editorLangId == unimarkup",
+					"group": "navigation@1"
+				}
+			]
+		},
+		"keybindings": [
+			{
+				"command": "um.preview",
+				"key": "ctrl+q s",
+				"mac": "cmd+q s",
+				"when": "editorTextFocus"
+			}
+		]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
