@@ -12,19 +12,14 @@ pub(crate) fn doc_change_loop(tx_um: Sender<UnimarkupDocument>, rx_doc_open: Rec
 		out_formats: Some(vec![OutputFormat::Html]),
 		..Default::default()
 	};
-	
-	if let Ok(opened_doc) = rx_doc_open.recv() {
-		config.um_file = opened_doc.text_document.uri.to_file_path().unwrap();
-		let rendered_doc = unimarkup_core::unimarkup::compile(&opened_doc.text_document.text, config.clone()).unwrap();
-		tx_um.send(rendered_doc).unwrap();
-	}
 
 	while rx_shutdown.try_recv().is_err() {
-		if let Ok(changes) = rx_doc_change.recv() {
+		if let Ok(changes) = rx_doc_change.try_recv() {
 			config.um_file = changes.text_document.uri.to_file_path().unwrap();
 			let rendered_doc = unimarkup_core::unimarkup::compile(&changes.content_changes[0].text.clone(), config.clone()).unwrap();
 			tx_um.send(rendered_doc).unwrap();
-		} else if let Ok(opened_doc) = rx_doc_open.recv() {
+		} else if let Ok(opened_doc) = rx_doc_open.try_recv() {
+			eprintln!("Got here!!!!");
 			config.um_file = opened_doc.text_document.uri.to_file_path().unwrap();
 			let rendered_doc = unimarkup_core::unimarkup::compile(&opened_doc.text_document.text.clone(), config.clone()).unwrap();
 			tx_um.send(rendered_doc).unwrap();
