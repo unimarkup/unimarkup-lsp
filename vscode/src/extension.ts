@@ -1,4 +1,4 @@
-import { ExtensionContext, window, commands, WebviewPanel } from 'vscode';
+import { ExtensionContext, window, commands, WebviewPanel, Uri } from 'vscode';
 
 import {
   LanguageClient,
@@ -8,7 +8,7 @@ import {
 } from 'vscode-languageclient/node';
 
 let client: LanguageClient;
-let renderedContent: string = "";
+const renderedContents = new Map();
 
 export function activate(context: ExtensionContext) {
 	let serverPath = "..\\server\\target\\debug\\unimarkup_ls.exe";
@@ -51,14 +51,26 @@ export function activate(context: ExtensionContext) {
     }
   ).then(
     () => client.onNotification(new NotificationType<RenderedContent>('extension/renderedContent'), (data: RenderedContent) => {
-      renderedContent = data.content;
-      previewPanel.webview.html = renderedContent;
+      const contentUri = Uri.parse(data.id.toString());
+      renderedContents.set(contentUri.fsPath, data.content);
+      previewPanel.webview.html = renderedContents.get(contentUri.fsPath);
+      previewPanel.title = getPreviewTitle(contentUri);
     })
+  );
+
+  window.onDidChangeActiveTextEditor(
+    (activeEditor) => {
+      let content = renderedContents.get(activeEditor?.document.uri.fsPath);
+      if (content !== undefined && previewPanel !== undefined) {
+        previewPanel.webview.html = content;
+        previewPanel.title = getPreviewTitle(window.activeTextEditor?.document.uri);
+      }
+    }
   );
 }
 
 interface RenderedContent {
-  id: string,
+  id: Uri,
   content: string
 }
 
@@ -82,8 +94,21 @@ async function initPreview(context: ExtensionContext): Promise<WebviewPanel> {
         localResourceRoots: []
     }
   );
+  
+  let content = renderedContents.get(window.activeTextEditor?.document.uri.fsPath);
+  if (content === undefined) {
+    content = "";
+  }
 
-  panel.webview.html = renderedContent;
+  panel.webview.html = content;
+  panel.title = getPreviewTitle(window.activeTextEditor?.document.uri);
 
   return panel;
+}
+
+function getPreviewTitle(uri: Uri | undefined): string {
+  if (uri === undefined) {
+    return "Unimarkup Preview";
+  }
+  return "[Preview] " + uri.path.split(`/`).pop();
 }

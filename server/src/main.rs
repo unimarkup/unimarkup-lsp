@@ -5,7 +5,7 @@ use std::sync::mpsc;
 use std::thread;
 
 use lsp_types::request::SemanticTokensFullRequest;
-use lsp_types::{DidChangeTextDocumentParams, DidOpenTextDocumentParams, SemanticTokensParams};
+use lsp_types::{DidChangeTextDocumentParams, DidOpenTextDocumentParams, SemanticTokensParams, Url};
 use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::{
     request::Request, InitializeParams, notification::{DidChangeTextDocument, Notification},
@@ -19,7 +19,7 @@ mod semantic_tokens;
 
 #[derive(Debug, Clone, Serialize)]
 struct RenderedContent {
-    id: String,
+    id: Url,
     content: String,
 }
 
@@ -49,7 +49,7 @@ fn main_loop(
         doc_sync::doc_change_loop(tx_um, rx_doc_open, rx_doc_change, rx_shutdown);
     });
 
-    let mut rendered_documents: HashMap<String, UnimarkupDocument> = HashMap::new();
+    let mut rendered_documents: HashMap<Url, UnimarkupDocument> = HashMap::new();
     let mut update_cnt = 0;
 
     loop {
@@ -68,7 +68,7 @@ fn main_loop(
 
                             if let Ok((id, params)) = req.extract::<SemanticTokensParams>(SemanticTokensFullRequest::METHOD) {
                                 let file_path = params.text_document.uri.to_file_path().unwrap();
-                                if let Some(rendered_um) = rendered_documents.get(&file_path.to_string_lossy().to_string()) {
+                                if let Some(rendered_um) = rendered_documents.get(&Url::from_file_path(file_path).unwrap()) {
                                     resp = semantic_tokens::get_semantic_tokens(id, params, Some((*rendered_um).clone()));
                                 } else {
                                     resp = semantic_tokens::get_semantic_tokens(id, params, None);
@@ -108,7 +108,7 @@ fn main_loop(
         if let Ok(um) = rx_um.try_recv() {
             update_cnt += 1;
 
-            let file_id = um.config.um_file.to_string_lossy().to_string();
+            let file_id = Url::from_file_path(um.config.um_file.clone()).unwrap();
             let rendered_content = RenderedContent {
                 id: file_id.clone(),
                 content: um.html().body(),

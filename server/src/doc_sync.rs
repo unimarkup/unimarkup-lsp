@@ -19,7 +19,6 @@ pub(crate) fn doc_change_loop(tx_um: Sender<UnimarkupDocument>, rx_doc_open: Rec
 			let rendered_doc = unimarkup_core::unimarkup::compile(&changes.content_changes[0].text.clone(), config.clone()).unwrap();
 			tx_um.send(rendered_doc).unwrap();
 		} else if let Ok(opened_doc) = rx_doc_open.try_recv() {
-			eprintln!("Got here!!!!");
 			config.um_file = opened_doc.text_document.uri.to_file_path().unwrap();
 			let rendered_doc = unimarkup_core::unimarkup::compile(&opened_doc.text_document.text.clone(), config.clone()).unwrap();
 			tx_um.send(rendered_doc).unwrap();
