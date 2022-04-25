@@ -14,8 +14,7 @@ use lsp_types::SemanticTokensResult;
 use lsp_server::Response;
 use lsp_types::SemanticTokensParams;
 
-pub fn get_semantic_tokens(id: RequestId, params: SemanticTokensParams, rendered_um: Option<&UnimarkupDocument>) -> Response {
-	eprintln!("got semantic token request #{}: {:?}", id, params);
+pub fn get_semantic_tokens(id: RequestId, params: SemanticTokensParams, rendered_um: Option<UnimarkupDocument>) -> Response {
 	let mut tokens = SemanticTokens {
 		result_id: Some(id.to_string()),
 		..Default::default()
@@ -23,7 +22,6 @@ pub fn get_semantic_tokens(id: RequestId, params: SemanticTokensParams, rendered
 
 	if let Some(um_doc) = rendered_um {
 		tokens.data = make_relative(um_doc.tokens());
-		eprintln!("Sent tokens: {:?}", tokens.data);
 	}
 
 	let result = Some(SemanticTokensResult::Tokens(tokens));
@@ -47,7 +45,6 @@ fn make_relative(mut tokens: Vec<SemanticToken>) -> Vec<SemanticToken> {
 	});
 
 	let mut sorted_tokens = tokens.clone();
-	eprintln!("Tokens: {:?}", sorted_tokens);
 	for (i, token) in sorted_tokens.iter_mut().enumerate() {
 		if i < tokens.len() - 1 {
 			if let Some(next_token) = tokens.get(i + 1) {

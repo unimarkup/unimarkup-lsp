@@ -69,7 +69,7 @@ fn main_loop(
                             if let Ok((id, params)) = req.extract::<SemanticTokensParams>(SemanticTokensFullRequest::METHOD) {
                                 let file_path = params.text_document.uri.to_file_path().unwrap();
                                 if let Some(rendered_um) = rendered_documents.get(&file_path.to_string_lossy().to_string()) {
-                                    resp = semantic_tokens::get_semantic_tokens(id, params, Some(rendered_um));
+                                    resp = semantic_tokens::get_semantic_tokens(id, params, Some((*rendered_um).clone()));
                                 } else {
                                     resp = semantic_tokens::get_semantic_tokens(id, params, None);
                                 }
