@@ -38,7 +38,11 @@ fn main_loop(
     connection: Connection,
     params: serde_json::Value,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let _params: InitializeParams = serde_json::from_value(params).unwrap();
+    let params: InitializeParams = serde_json::from_value(params).unwrap();
+    let mut semantic_tokens_supported = false;
+    if let Some(workspace_capabilities) = params.capabilities.workspace {
+        semantic_tokens_supported = workspace_capabilities.semantic_tokens.is_some();
+    }
 
     let (tx_um, rx_um) = mpsc::channel::<UnimarkupDocument>();
     let (tx_doc_open, rx_doc_open) = mpsc::channel::<DidOpenTextDocumentParams>();
@@ -122,13 +126,15 @@ fn main_loop(
             };
             connection.sender.send(Message::Notification(resp))?;
 
-            connection.sender.send(Message::Request(
-                lsp_server::Request{
-                    id: format!("doc-update-{}", update_cnt).into(),
-                    method: "workspace/semanticTokens/refresh".to_string(),
-                    params: serde_json::Value::Null,
-                }
-            ))?;
+            if semantic_tokens_supported {
+                connection.sender.send(Message::Request(
+                    lsp_server::Request{
+                        id: format!("doc-update-{}", update_cnt).into(),
+                        method: "workspace/semanticTokens/refresh".to_string(),
+                        params: serde_json::Value::Null,
+                    }
+                ))?;
+            }
         }
     }
 }

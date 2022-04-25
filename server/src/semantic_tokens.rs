@@ -14,7 +14,7 @@ use lsp_types::SemanticTokensResult;
 use lsp_server::Response;
 use lsp_types::SemanticTokensParams;
 
-pub fn get_semantic_tokens(id: RequestId, params: SemanticTokensParams, rendered_um: Option<UnimarkupDocument>) -> Response {
+pub fn get_semantic_tokens(id: RequestId, _params: SemanticTokensParams, rendered_um: Option<UnimarkupDocument>) -> Response {
 	let mut tokens = SemanticTokens {
 		result_id: Some(id.to_string()),
 		..Default::default()
