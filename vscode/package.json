@@ -61,6 +61,11 @@
       {
 				"command": "um.preview",
 				"title": "Show side preview",
+				"category": "Unimarkup"
+      },
+      {
+				"command": "um.explicitPreview",
+				"title": "Explicitly create new side preview",
 				"category": "Unimarkup",
         "icon": "$(open-preview)"
       },
@@ -74,7 +79,7 @@
     "menus": {
 			"editor/title": [
 				{
-					"command": "um.preview",
+					"command": "um.explicitPreview",
 					"when": "editorLangId == unimarkup",
 					"group": "navigation@1"
 				}
@@ -85,6 +90,12 @@
 				"command": "um.preview",
 				"key": "ctrl+q s",
 				"mac": "cmd+q s",
+				"when": "editorTextFocus"
+			},
+      {
+				"command": "um.explicitPreview",
+				"key": "ctrl+q d",
+				"mac": "cmd+q d",
 				"when": "editorTextFocus"
 			}
 		]
