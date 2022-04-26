@@ -9,6 +9,8 @@ import {
 
 let client: LanguageClient;
 const renderedContents = new Map<string, string>();
+const previewPanels = new Set<IdWebPanel>();
+let activePreviewPanel: IdWebPanel;
 
 export function activate(context: ExtensionContext) {
 	let serverPath = "..\\server\\target\\debug\\unimarkup_ls.exe";
@@ -39,39 +41,13 @@ export function activate(context: ExtensionContext) {
 
   client.start();
 
-  let previewPanels = new Set<IdWebPanel>();
-  let activePreviewPanel: IdWebPanel;
-  let getActiveUriFsPath = () => {
-    let uri = window.activeTextEditor?.document.uri;
-    if (uri === undefined) {
-      return "";
-    } else {
-      return uri.fsPath;
-    }
-  };
-
   client.onReady().then(
     () => {
-      const disposableSidePreview = commands.registerCommand('um.preview', async () => {
-        let uriFsPath = getActiveUriFsPath();
-        let panelMatch = findFirstMatchingPanel(previewPanels, uriFsPath);
-
-        if (previewPanels === undefined || previewPanels.size === 0
-          || panelMatch === undefined || activePreviewPanel === undefined) {
-
-          activePreviewPanel = await createPreview(context, previewPanels, uriFsPath);
-        } else {
-          activePreviewPanel = panelMatch;
-          activePreviewPanel.panel.reveal(undefined, true);
-        }
-      });
-      const disposableExplicitSidePreview = commands.registerCommand('um.explicitPreview', async () => {
-        let uriFsPath = getActiveUriFsPath();
-        activePreviewPanel = await createPreview(context, previewPanels, uriFsPath);
+      const disposablePreview = commands.registerCommand('um.preview', async () => {
+        activePreviewPanel = await createPreview(context, previewPanels, getActiveUriFsPath());
       });
 
-      context.subscriptions.push(disposableSidePreview);
-      context.subscriptions.push(disposableExplicitSidePreview);
+      context.subscriptions.push(disposablePreview);
     }
   ).then(
     () => client.onNotification(new NotificationType<RenderedContent>('extension/renderedContent'), (data: RenderedContent) => {
@@ -157,6 +133,15 @@ function findFirstMatchingPanel(panels: Set<IdWebPanel> | undefined, id: string)
   return undefined;
 }
 
+function getActiveUriFsPath(): string {
+  let uri = window.activeTextEditor?.document.uri;
+  if (uri === undefined) {
+    return "";
+  } else {
+    return uri.fsPath;
+  }
+};
+
 async function createPreview(context: ExtensionContext, panels: Set<IdWebPanel>, uriFsPath: string): Promise<IdWebPanel> {
   let content = renderedContents.get(uriFsPath);
   if (content === undefined) {
@@ -183,6 +168,12 @@ async function createPreview(context: ExtensionContext, panels: Set<IdWebPanel>,
 
   idPanel.panel.onDidDispose(() => {
     panels.delete(idPanel);
+  });
+
+  idPanel.panel.onDidChangeViewState((panelEvent) => {
+    if (panelEvent.webviewPanel.active && idPanel !== activePreviewPanel) {
+      activePreviewPanel = idPanel;
+    }
   });
 
   return idPanel;
