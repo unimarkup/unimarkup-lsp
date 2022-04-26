@@ -36,6 +36,15 @@ pub fn get_capabilities() -> ServerCapabilities {
             ],
             token_modifiers: vec![
                 SemanticTokenModifier::DECLARATION,
+                SemanticTokenModifier::DEFINITION,
+                SemanticTokenModifier::READONLY,
+                SemanticTokenModifier::STATIC,
+                SemanticTokenModifier::DEPRECATED,
+                SemanticTokenModifier::ABSTRACT,
+                SemanticTokenModifier::ASYNC,
+                SemanticTokenModifier::MODIFICATION,
+                SemanticTokenModifier::DOCUMENTATION,
+                SemanticTokenModifier::DEFAULT_LIBRARY,
             ] 
         },
         ..Default::default()
