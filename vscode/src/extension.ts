@@ -51,10 +51,12 @@ export function activate(context: ExtensionContext) {
     }
   ).then(
     () => client.onNotification(new NotificationType<RenderedContent>('extension/renderedContent'), (data: RenderedContent) => {
-      const contentUri = Uri.parse(data.id.toString());
-      renderedContents.set(contentUri.fsPath, data.content);
-      previewPanel.webview.html = renderedContents.get(contentUri.fsPath);
-      previewPanel.title = getPreviewTitle(contentUri);
+      if (data !== undefined) {
+        const contentUri = Uri.parse(data.id.toString());
+        renderedContents.set(contentUri.fsPath, data.content);
+        previewPanel.webview.html = renderedContents.get(contentUri.fsPath);
+        previewPanel.title = getPreviewTitle(contentUri);
+      }
     })
   );
 

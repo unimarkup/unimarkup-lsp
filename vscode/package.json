@@ -62,19 +62,13 @@
 				"command": "um.preview",
 				"title": "Show side preview",
 				"category": "Unimarkup",
-        "icon": {
-          "light": "./assets/preview_icon_for_light.svg",
-          "dark": "./assets/preview_icon_for_dark.svg"
-        }
+        "icon": "$(open-preview)"
       },
       {
 				"command": "onLanguage:unimarkup",
 				"title": "Show side preview",
 				"category": "Unimarkup",
-        "icon": {
-          "light": "./assets/preview_icon_for_light.svg",
-          "dark": "./assets/preview_icon_for_dark.svg"
-        }
+        "icon": "$(open-preview)"
       }
     ],
     "menus": {
