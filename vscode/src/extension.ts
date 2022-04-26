@@ -1,4 +1,4 @@
-import { ExtensionContext, window, commands, WebviewPanel, Uri } from 'vscode';
+import { ExtensionContext, window, commands, WebviewPanel, Uri, ViewColumn, WebviewPanelSerializer } from 'vscode';
 
 import {
   LanguageClient,
@@ -9,6 +9,8 @@ import {
 
 let client: LanguageClient;
 const renderedContents = new Map<string, string>();
+
+const PANEL_VIEW_TYPE = 'unimarkup.preview';
 const previewPanels = new Set<IdWebPanel>();
 let activePreviewPanel: IdWebPanel;
 
@@ -64,7 +66,7 @@ export function activate(context: ExtensionContext) {
 
         let content = renderedContents.get(contentUri.fsPath);
         if (content !== undefined && activePreviewPanel !== undefined) {
-          activePreviewPanel.panel.webview.html = content;
+          activePreviewPanel.panel.webview.postMessage(new PreviewState(activePreviewPanel.id, getHtmlTemplate(content)));
           activePreviewPanel.panel.title = getPreviewTitle(contentUri);
           activePreviewPanel.panel.reveal(undefined, true);
         }
@@ -88,13 +90,15 @@ export function activate(context: ExtensionContext) {
         let content = renderedContents.get(uriFsPath);
         if (content !== undefined && activePreviewPanel !== undefined) {
           activePreviewPanel.id = uriFsPath;
-          activePreviewPanel.panel.webview.html = content;
+          activePreviewPanel.panel.webview.postMessage(new PreviewState(activePreviewPanel.id, getHtmlTemplate(content)));
           activePreviewPanel.panel.title = getPreviewTitle(activeEditor?.document.uri);
           activePreviewPanel.panel.reveal(undefined, true);
         }
       }
     }
   );
+
+  window.registerWebviewPanelSerializer(PANEL_VIEW_TYPE, new PreviewSerializer());
 }
 
 interface RenderedContent {
@@ -142,17 +146,26 @@ function getActiveUriFsPath(): string {
   }
 };
 
+class PreviewSerializer implements WebviewPanelSerializer {
+  async deserializeWebviewPanel(webviewPanel: WebviewPanel, state: any) {
+    webviewPanel.webview.html = getWebviewContent();
+    let id = state ? state.id : undefined;
+    if (id !== undefined) {
+      previewPanels.add(new IdWebPanel(id, webviewPanel));
+    }
+  }
+}
+
 async function createPreview(context: ExtensionContext, panels: Set<IdWebPanel>, uriFsPath: string): Promise<IdWebPanel> {
   let content = renderedContents.get(uriFsPath);
   if (content === undefined) {
-    content = "";
+    content = "<p>Loading</p>";
   }
   
   const panel = window.createWebviewPanel(
-    'unimarkup.preview',
+    PANEL_VIEW_TYPE,
     'Unimarkup Preview',
-    // Open the second column for preview inside editor
-    2,
+    ViewColumn.Two,
     {
       enableScripts: true,
       retainContextWhenHidden: true,
@@ -160,8 +173,9 @@ async function createPreview(context: ExtensionContext, panels: Set<IdWebPanel>,
     }
   );
 
-  panel.webview.html = content;
+  panel.webview.html = getWebviewContent();
   panel.title = getPreviewTitle(window.activeTextEditor?.document.uri);
+  panel.webview.postMessage(new PreviewState(uriFsPath, getHtmlTemplate(content)));
 
   const idPanel = new IdWebPanel(uriFsPath, panel);
   panels.add(idPanel);
@@ -185,3 +199,85 @@ function getPreviewTitle(uri: Uri | undefined): string {
   }
   return "[Preview] " + uri.path.split(`/`).pop();
 }
+
+class PreviewState {
+  id: string;
+  content: string;
+
+  constructor(id: string, content: string) {
+    this.id = id;
+    this.content = content;
+  }
+}
+
+
+function getWebviewContent(): string {
+  return `<!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+  
+      <meta http-equiv="Content-Security-Policy">
+  
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+      <title>View</title>
+  
+      <script type="text/javascript">
+        const vscode = acquireVsCodeApi();
+        const previousState = vscode.getState();
+        let initialized = false;
+
+        function initializeIframe() {
+          let content = previousState ? previousState.content : undefined;
+
+          if (content && !initialized) {
+            let blob = new Blob([content], {type: "text/html; charset=utf-8"});
+            event.target.src = URL.createObjectURL(blob);
+            initialized = true;
+          }
+        }        
+
+        function updateIframe(content) {
+          let iframe = document.getElementById("preview");
+
+          if (content) {
+            let blob = new Blob([content], {type: "text/html; charset=utf-8"});
+            iframe.src = URL.createObjectURL(blob);
+          }
+        }
+
+        window.addEventListener('message', event => {
+          const message = event.data;
+
+          updateIframe(message.content);
+          vscode.setState(message);
+        })
+      </script>
+  </head>
+  <body>
+  
+    <iframe id="preview" onload="initializeIframe()" width="100%" height="100%" style="border: none;"></iframe>
+
+  </body>
+  </html>
+  `;
+}
+
+function getHtmlTemplate(body: string): string {
+  return `<!DOCTYPE html>
+  <html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="Content-Security-Policy">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+      <title>Preview</title>
+  </head>
+  <body>
+    ${body}
+  </body>
+  </html>
+  `;
+}
+
