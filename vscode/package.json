@@ -10,7 +10,8 @@
     "Programming Languages"
   ],
   "activationEvents": [
-    "onLanguage:unimarkup"
+    "onLanguage:unimarkup",
+    "onWebviewPanel:unimarkup.preview"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -59,35 +60,35 @@
     },
     "commands": [
       {
-				"command": "um.preview",
-				"title": "Create new preview",
-				"category": "Unimarkup",
+        "command": "um.preview",
+        "title": "Create new preview",
+        "category": "Unimarkup",
         "icon": "$(open-preview)"
       },
       {
-				"command": "onLanguage:unimarkup",
-				"title": "Show preview",
-				"category": "Unimarkup",
+        "command": "onLanguage:unimarkup",
+        "title": "Show preview",
+        "category": "Unimarkup",
         "icon": "$(open-preview)"
       }
     ],
     "menus": {
-			"editor/title": [
-				{
-					"command": "um.preview",
-					"when": "editorLangId == unimarkup",
-					"group": "navigation@1"
-				}
-			]
-		},
-		"keybindings": [
-			{
-				"command": "um.preview",
-				"key": "ctrl+q s",
-				"mac": "cmd+q s",
-				"when": "editorTextFocus"
-			}
-		]
+      "editor/title": [
+        {
+          "command": "um.preview",
+          "when": "editorLangId == unimarkup",
+          "group": "navigation@1"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "um.preview",
+        "key": "ctrl+q s",
+        "mac": "cmd+q s",
+        "when": "editorTextFocus"
+      }
+    ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
