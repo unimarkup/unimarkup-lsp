@@ -66,8 +66,8 @@ export function activate(context: ExtensionContext) {
         let content = renderedContents.get(contentUri.fsPath);
         if (content !== undefined && activePreviewPanel !== undefined) {
           activePreviewPanel.id = contentUri.fsPath;
-          activePreviewPanel.panel.webview.html = getWebviewContent(content);
-          activePreviewPanel.panel.webview.postMessage(new PreviewState(activePreviewPanel.id));
+          activePreviewPanel.panel.webview.html = getWebviewContent(content, new PreviewState(activePreviewPanel.id));
+          // activePreviewPanel.panel.webview.postMessage(new PreviewState(activePreviewPanel.id));
           activePreviewPanel.panel.title = getPreviewTitle(contentUri);
           activePreviewPanel.panel.reveal(undefined, true);
         }
@@ -91,8 +91,8 @@ export function activate(context: ExtensionContext) {
         let content = renderedContents.get(uriFsPath);
         if (content !== undefined && activePreviewPanel !== undefined) {
           activePreviewPanel.id = uriFsPath;
-          activePreviewPanel.panel.webview.html = getWebviewContent(content);
-          activePreviewPanel.panel.webview.postMessage(new PreviewState(activePreviewPanel.id));
+          activePreviewPanel.panel.webview.html = getWebviewContent(content, new PreviewState(activePreviewPanel.id));
+          // activePreviewPanel.panel.webview.postMessage(new PreviewState(activePreviewPanel.id));
           activePreviewPanel.panel.title = getPreviewTitle(activeEditor?.document.uri);
           activePreviewPanel.panel.reveal(undefined, true);
         }
@@ -168,7 +168,7 @@ class PreviewSerializer implements WebviewPanelSerializer {
           content = getHtmlTemplate("<p>Original document does not exist anymore!</p>");
         }
       }
-      webviewPanel.webview.html = getWebviewContent(content);
+      webviewPanel.webview.html = getWebviewContent(content, new PreviewState(uriFsPath));
 
       let webPanel = new IdWebPanel(uriFsPath, webviewPanel);
       previewPanels.add(webPanel);
@@ -201,8 +201,8 @@ async function createPreview(context: ExtensionContext, panels: Set<IdWebPanel>,
     }
   );
 
-  panel.webview.html = getWebviewContent(content);
-  panel.webview.postMessage(new PreviewState(uriFsPath));
+  panel.webview.html = getWebviewContent(content, new PreviewState(uriFsPath));
+  // panel.webview.postMessage(new PreviewState(uriFsPath));
   panel.title = getPreviewTitle(window.activeTextEditor?.document.uri);
 
   const idPanel = new IdWebPanel(uriFsPath, panel);
@@ -237,10 +237,11 @@ class PreviewState {
 }
 
 
-function getWebviewContent(renderedPage: string): string {
+function getWebviewContent(renderedPage: string, state: PreviewState): string {
   let stateScript = `
     <script type="text/javascript">
       const vscode = acquireVsCodeApi();
+      vscode.setState(${JSON.stringify(state)});
 
       window.addEventListener('message', event => {
         vscode.setState(event.data);
