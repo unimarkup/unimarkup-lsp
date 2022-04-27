@@ -1,5 +1,5 @@
 import path = require('path');
-import { ExtensionContext, window, commands, WebviewPanel, Uri, ViewColumn, WebviewPanelSerializer, Webview, workspace } from 'vscode';
+import { ExtensionContext, window, commands, WebviewPanel, Uri, ViewColumn, WebviewPanelSerializer, Webview, workspace, TextEditor } from 'vscode';
 
 import {
   LanguageClient,
@@ -14,6 +14,11 @@ const renderedContents = new Map<string, string>();
 const PANEL_VIEW_TYPE = 'unimarkup.preview';
 const previewPanels = new Set<IdWebPanel>();
 let activePreviewPanel: IdWebPanel;
+
+interface RenderedContent {
+  id: Uri,
+  content: string
+}
 
 export function activate(context: ExtensionContext) {
 	let serverPath = "..\\server\\target\\debug\\unimarkup_ls.exe";
@@ -47,7 +52,7 @@ export function activate(context: ExtensionContext) {
   client.onReady().then(
     () => {
       const disposablePreview = commands.registerCommand('um.preview', async () => {
-        activePreviewPanel = await createPreview(context, previewPanels, getActiveUriFsPath());
+        activePreviewPanel = await createPreview(context, getActiveUriFsPath());
       });
 
       context.subscriptions.push(disposablePreview);
@@ -58,19 +63,7 @@ export function activate(context: ExtensionContext) {
         const contentUri = Uri.parse(data.id.toString());
         renderedContents.set(contentUri.fsPath, getHtmlTemplate(data.content));
 
-        let previewPanel = findFirstMatchingPanel(previewPanels, contentUri.fsPath);
-        if (previewPanel !== undefined) {
-          activePreviewPanel = previewPanel;
-        }
-
-        let content = renderedContents.get(contentUri.fsPath);
-        if (content !== undefined && activePreviewPanel !== undefined) {
-          activePreviewPanel.id = contentUri.fsPath;
-          activePreviewPanel.panel.webview.html = getWebviewContent(content, new PreviewState(activePreviewPanel.id));
-          // activePreviewPanel.panel.webview.postMessage(new PreviewState(activePreviewPanel.id));
-          activePreviewPanel.panel.title = getPreviewTitle(contentUri);
-          activePreviewPanel.panel.reveal(undefined, true);
-        }
+        updatePreview(contentUri.fsPath, getOrigEditor(contentUri.fsPath));
       }
     })
   );
@@ -78,34 +71,45 @@ export function activate(context: ExtensionContext) {
   window.onDidChangeActiveTextEditor(
     (activeEditor) => {
       let uriFsPath = activeEditor?.document.uri.fsPath;
-      if (uriFsPath === undefined) {
-        return;
-      }
 
       if (activeEditor?.document.languageId === 'unimarkup') {
-        let previewPanel = findFirstMatchingPanel(previewPanels, uriFsPath);
-        if (previewPanel !== undefined) {
-          activePreviewPanel = previewPanel;
-        }
-
-        let content = renderedContents.get(uriFsPath);
-        if (content !== undefined && activePreviewPanel !== undefined) {
-          activePreviewPanel.id = uriFsPath;
-          activePreviewPanel.panel.webview.html = getWebviewContent(content, new PreviewState(activePreviewPanel.id));
-          // activePreviewPanel.panel.webview.postMessage(new PreviewState(activePreviewPanel.id));
-          activePreviewPanel.panel.title = getPreviewTitle(activeEditor?.document.uri);
-          activePreviewPanel.panel.reveal(undefined, true);
-        }
+        updatePreview(uriFsPath, activeEditor);
       }
     }
   );
 
-  window.registerWebviewPanelSerializer(PANEL_VIEW_TYPE, new PreviewSerializer(context.extensionPath));
+  window.registerWebviewPanelSerializer(PANEL_VIEW_TYPE, new PreviewSerializer());
 }
 
-interface RenderedContent {
-  id: Uri,
-  content: string
+function getOrigEditor(urifsPath: string): TextEditor | undefined {
+  for (const editor of window.visibleTextEditors) {
+    if (editor.document.uri.fsPath === urifsPath) {
+      return editor;
+    }
+  }
+  return undefined;
+}
+
+function updatePreview(uriFsPath: string | undefined, origContentEditor: TextEditor | undefined) {
+  if (uriFsPath === undefined) {
+    return;
+  }
+
+  let previewPanel = findFirstMatchingPanel(previewPanels, uriFsPath);
+  if (previewPanel !== undefined) {
+    activePreviewPanel = previewPanel;
+  }
+
+  let content = renderedContents.get(uriFsPath);
+  if (content !== undefined && activePreviewPanel !== undefined) {
+    activePreviewPanel.id = uriFsPath;
+    activePreviewPanel.panel.webview.html = getWebviewContent(content, new PreviewState(activePreviewPanel.id));
+    activePreviewPanel.panel.title = getPreviewTitle(uriFsPath);
+  }
+
+  if (origContentEditor !== undefined && activePreviewPanel.panel.viewColumn !== origContentEditor.viewColumn) {
+    activePreviewPanel.panel.reveal(undefined, true);
+  }
 }
 
 export function deactivate(): Thenable<void> | undefined {
@@ -122,6 +126,17 @@ class IdWebPanel {
   constructor(id: string, panel: WebviewPanel) {
     this.id = id;
     this.panel = panel;
+    previewPanels.add(this);
+
+    this.panel.onDidDispose(() => {
+      previewPanels.delete(this);
+    });
+  
+    this.panel.onDidChangeViewState((panelEvent) => {
+      if (panelEvent.webviewPanel.active && this !== activePreviewPanel) {
+        activePreviewPanel = this;
+      }
+    });
   }
 }
 
@@ -149,12 +164,6 @@ function getActiveUriFsPath(): string {
 };
 
 class PreviewSerializer implements WebviewPanelSerializer {
-  extensionPath: string;
-
-  constructor(extensionPath: string) {
-    this.extensionPath = extensionPath;
-  }
-
   async deserializeWebviewPanel(webviewPanel: WebviewPanel, state: any) {
     let uriFsPath = state ? state.id : undefined;
     if (uriFsPath !== undefined) {
@@ -170,23 +179,12 @@ class PreviewSerializer implements WebviewPanelSerializer {
       }
       webviewPanel.webview.html = getWebviewContent(content, new PreviewState(uriFsPath));
 
-      let webPanel = new IdWebPanel(uriFsPath, webviewPanel);
-      previewPanels.add(webPanel);
-
-      webPanel.panel.onDidDispose(() => {
-        previewPanels.delete(webPanel);
-      });
-    
-      webPanel.panel.onDidChangeViewState((panelEvent) => {
-        if (panelEvent.webviewPanel.active && webPanel !== activePreviewPanel) {
-          activePreviewPanel = webPanel;
-        }
-      });
+      let _ = new IdWebPanel(uriFsPath, webviewPanel);
     }
   }
 }
 
-async function createPreview(context: ExtensionContext, panels: Set<IdWebPanel>, uriFsPath: string): Promise<IdWebPanel> {
+async function createPreview(context: ExtensionContext, uriFsPath: string): Promise<IdWebPanel> {
   let content = renderedContents.get(uriFsPath);
   if (content === undefined) {
     content = getHtmlTemplate("<p>Loading</p>");
@@ -202,30 +200,17 @@ async function createPreview(context: ExtensionContext, panels: Set<IdWebPanel>,
   );
 
   panel.webview.html = getWebviewContent(content, new PreviewState(uriFsPath));
-  // panel.webview.postMessage(new PreviewState(uriFsPath));
-  panel.title = getPreviewTitle(window.activeTextEditor?.document.uri);
+  panel.title = getPreviewTitle(uriFsPath);
 
-  const idPanel = new IdWebPanel(uriFsPath, panel);
-  panels.add(idPanel);
-
-  idPanel.panel.onDidDispose(() => {
-    panels.delete(idPanel);
-  });
-
-  idPanel.panel.onDidChangeViewState((panelEvent) => {
-    if (panelEvent.webviewPanel.active && idPanel !== activePreviewPanel) {
-      activePreviewPanel = idPanel;
-    }
-  });
-
-  return idPanel;
+  return new IdWebPanel(uriFsPath, panel);
 }
 
-function getPreviewTitle(uri: Uri | undefined): string {
-  if (uri === undefined) {
+function getPreviewTitle(uriFsPath: string): string {
+  let filename = path.parse(uriFsPath).base;
+  if (filename === undefined) {
     return "Unimarkup Preview";
   }
-  return "[Preview] " + uri.path.split(`/`).pop();
+  return "[Preview] " + filename;
 }
 
 class PreviewState {
