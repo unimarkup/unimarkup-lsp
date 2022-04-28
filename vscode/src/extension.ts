@@ -247,6 +247,12 @@ function getHtmlTemplate(body: string): string {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>Preview</title>
+
+    <style>
+      .code-block pre {
+        padding: 0.5em 1em;
+      }
+    </style>
   </head>
   <body>
     ${body}
