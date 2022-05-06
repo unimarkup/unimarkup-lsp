@@ -86,7 +86,7 @@
         "command": "um.preview",
         "key": "ctrl+q s",
         "mac": "cmd+q s",
-        "when": "editorTextFocus"
+        "when": "editorTextFocus && editorLangId == unimarkup"
       }
     ]
   },
