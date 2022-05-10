@@ -21,7 +21,7 @@ interface RenderedContent {
 }
 
 export function activate(context: ExtensionContext) {
-	let serverPath = "..\\server\\target\\debug\\unimarkup_ls.exe";
+	let serverPath = getServerPath();
   serverPath = context.asAbsolutePath(serverPath);
 
   let serverOptions: ServerOptions = {
@@ -79,6 +79,21 @@ export function activate(context: ExtensionContext) {
   );
 
   window.registerWebviewPanelSerializer(PANEL_VIEW_TYPE, new PreviewSerializer());
+}
+
+function getServerPath(): string {
+  const os = require('node:os');
+  if (os.platform() === 'win32') {
+    // Windows
+    return "server_bin\\unimarkup_ls.exe";
+  }
+  else if (os.platform() === 'darwin') {
+    // macOS
+    return "server_bin/unimarkup_ls";
+  } else {
+    // Assume Linux for others
+    return "server_bin/unimarkup_ls";
+  }
 }
 
 function getOrigEditor(urifsPath: string): TextEditor | undefined {

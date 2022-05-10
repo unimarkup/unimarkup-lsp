@@ -40,7 +40,7 @@
 			"options": {
 				"cwd": "${workspaceFolder}/server/"
 			},
-      "command": "cargo build --package unimarkup_ls",
+      "command": "cargo build --package unimarkup_ls; cp target\\debug\\unimarkup_ls* ..\\vscode\\server_bin",
       "problemMatcher": "$rustc"
     }
 	]
