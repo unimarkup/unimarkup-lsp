@@ -16,19 +16,17 @@
   "main": "./out/extension.js",
   "contributes": {
     "configurationDefaults": {
-      "[unimarkup]": {
-        "editor.quickSuggestions": false,
-        "editor.semanticTokenColorCustomizations": {
-          "enabled": true,
-          "rules": {
-            "*.declaration": {
-              "bold": true
-            },
-            "*.definition": {
-              "italic": true
-            },
-            "*.readonly": "#ff0000"
-          }
+      "editor.quickSuggestions": false,
+      "editor.semanticTokenColorCustomizations": {
+        "enabled": true,
+        "rules": {
+          "*.declaration": {
+            "bold": true
+          },
+          "*.definition": {
+            "italic": true
+          },
+          "*.readonly": "#ff0000"
         }
       }
     },
