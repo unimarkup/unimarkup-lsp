@@ -16,7 +16,9 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, SemanticTokensParams, Url,
 };
 
-use crate::{capabilities, doc_sync, semantic_tokens, RenderedContent};
+use crate::{capabilities, semantic_tokens, RenderedContent};
+
+mod doc_sync;
 
 pub(crate) fn run() -> Result<(), Box<dyn Error + Sync + Send>> {
     let (connection, io_threads) = Connection::stdio();
@@ -35,7 +37,9 @@ fn main_loop(
     params: serde_json::Value,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     let params: InitializeParams = serde_json::from_value(params).unwrap();
+
     let mut semantic_tokens_supported = false;
+
     if let Some(workspace_capabilities) = params.capabilities.workspace {
         semantic_tokens_supported = workspace_capabilities.semantic_tokens.is_some();
     }
