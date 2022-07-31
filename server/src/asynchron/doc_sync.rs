@@ -50,7 +50,6 @@ impl DocChangeWorker {
                     )
                     .unwrap();
 
-                    eprintln!("Sending the doc.");
                     let _ = self.tx_um.send(rendered_doc).await;
                 },
                 Some(opened_doc) = self.rx_doc_open.recv() => {
@@ -62,7 +61,6 @@ impl DocChangeWorker {
                     )
                     .unwrap();
 
-                    eprintln!("Sending the (opened) doc.");
                     let _ = self.tx_um.send(rendered_doc).await;
                 }
             }

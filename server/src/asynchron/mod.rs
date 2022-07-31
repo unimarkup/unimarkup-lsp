@@ -71,7 +71,6 @@ async fn main_loop(
                 let conn = Arc::clone(&conn);
                 tokio::task::spawn_blocking(move || conn.receiver.recv().unwrap())
             } => {
-                eprintln!("Received msg");
                 let connection = Arc::clone(&conn);
 
                 match msg {
@@ -110,8 +109,6 @@ async fn main_loop(
                                 eprintln!("Unsupported request: {:?}", req);
                             }
                         }
-
-                        eprintln!("After match");
                     }
                     Message::Response(resp) => {
                         eprintln!("got response: {:?}", resp);
@@ -121,7 +118,6 @@ async fn main_loop(
                             if let Ok(params) = notification
                                 .extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
                             {
-                                eprintln!("Sending changed doc");
                                 tx_doc_change.send(params).await?
                             }
                         }
@@ -129,7 +125,6 @@ async fn main_loop(
                             if let Ok(params) = notification
                                 .extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
                             {
-                                eprintln!("Sending opened doc");
                                 tx_doc_open.send(params).await?
                             }
                         }
@@ -141,7 +136,6 @@ async fn main_loop(
             },
 
             Some(um) = rx_um.recv() => {
-                eprintln!("Received document");
                 update_cnt += 1;
 
                 let file_id = Url::from_file_path(um.config.um_file.clone()).unwrap();
