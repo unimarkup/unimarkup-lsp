@@ -1,16 +1,19 @@
-use lsp_types::{SemanticTokensOptions, SemanticTokensFullOptions, SemanticTokenType, SemanticTokenModifier};
 use lsp_types::{
-    ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
+    SemanticTokenModifier, SemanticTokenType, SemanticTokensFullOptions, SemanticTokensOptions,
 };
+use lsp_types::{ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind};
 
 pub fn get_capabilities() -> ServerCapabilities {
-	let mut server_capabilities = ServerCapabilities::default();
+    let mut server_capabilities = ServerCapabilities::default();
 
     let text_sync = Some(TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL));
+
     server_capabilities.text_document_sync = text_sync;
-    let token_provider = lsp_types::SemanticTokensServerCapabilities::from(SemanticTokensOptions{
+
+    let token_provider = lsp_types::SemanticTokensServerCapabilities::from(SemanticTokensOptions {
         full: Some(SemanticTokensFullOptions::Bool(true)),
-        legend: lsp_types::SemanticTokensLegend { token_types: vec![
+        legend: lsp_types::SemanticTokensLegend {
+            token_types: vec![
                 SemanticTokenType::NAMESPACE,
                 SemanticTokenType::TYPE,
                 SemanticTokenType::CLASS,
@@ -45,10 +48,11 @@ pub fn get_capabilities() -> ServerCapabilities {
                 SemanticTokenModifier::MODIFICATION,
                 SemanticTokenModifier::DOCUMENTATION,
                 SemanticTokenModifier::DEFAULT_LIBRARY,
-            ] 
+            ],
         },
         ..Default::default()
     });
+
     server_capabilities.semantic_tokens_provider = Some(token_provider);
-		server_capabilities
+    server_capabilities
 }
