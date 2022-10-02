@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock};
 use unimarkup_core::unimarkup::UnimarkupDocument;
 
 use lsp_server::{Connection, Message, RequestId};
@@ -56,79 +56,108 @@ async fn main_loop(
     let (tx_um, mut rx_um) = mpsc::channel::<UnimarkupDocument>(10);
     let (tx_doc_open, rx_doc_open) = mpsc::channel::<DidOpenTextDocumentParams>(10);
     let (tx_doc_change, rx_doc_change) = mpsc::channel::<DidChangeTextDocumentParams>(10);
-    let (tx_shutdown, rx_shutdown) = mpsc::channel::<bool>(10);
+    let (tx_shutdown, _rx_shutdown) = mpsc::channel::<bool>(10);
 
-    let mut doc_change_worker =
-        DocChangeWorker::new(tx_um, rx_doc_open, rx_doc_change, rx_shutdown);
-
-    let mut rendered_documents: HashMap<Url, UnimarkupDocument> = HashMap::new();
+    let rendered_documents: Arc<RwLock<HashMap<Url, UnimarkupDocument>>> =
+        Arc::new(RwLock::new(HashMap::new()));
     let mut update_cnt = 0;
 
     let conn = Arc::new(connection);
 
-    loop {
-        tokio::select! {
-            Ok(msg) = {
-                let conn = Arc::clone(&conn);
-                tokio::task::spawn_blocking(move || conn.receiver.recv().unwrap())
-            } => {
-                let connection = Arc::clone(&conn);
+    DocChangeWorker::init(tx_um, rx_doc_open, rx_doc_change);
 
-                match handle_msg(msg, &connection)? {
-                    LspAction::SendSemanticTokens { id, params, file_path } => {
-                        let rendered_um = rendered_documents
-                            .get(&Url::from_file_path(file_path).unwrap())
-                            .map(|rendered_um| (*rendered_um).clone());
-
-                        let resp = semantic_tokens::get_semantic_tokens(id, params, rendered_um);
-                        connection.sender.send(Message::Response(resp))?;
-                    },
-                    LspAction::UpdateDoc(params) => tx_doc_change.send(params).await?,
-                    LspAction::OpenDoc(params) => tx_doc_open.send(params).await?,
-                    LspAction::Shutdown => {
-                        doc_change_worker.make_progress().await;
-                        tx_shutdown.send(true).await?;
-
-                        return Ok(());
-                    },
-                    LspAction::Continue => {},
-                }
-
-            },
-
-            Some(um) = rx_um.recv() => {
+    let conn2 = Arc::clone(&conn);
+    let mut ren_docs = Arc::clone(&rendered_documents);
+    tokio::spawn(async move {
+        loop {
+            if let Some(um) = rx_um.recv().await {
                 update_cnt += 1;
-
-                let file_id = Url::from_file_path(um.config.um_file.clone()).unwrap();
-                let rendered_content = RenderedContent {
-                    id: file_id.clone(),
-                    content: um.html().body(),
-                };
-
-                rendered_documents.insert(file_id, um);
-
-                let resp = lsp_server::Notification {
-                    method: "extension/renderedContent".to_string(),
-                    params: serde_json::to_value(rendered_content).unwrap(),
-                };
-                conn.sender.send(Message::Notification(resp))?;
-
-                if semantic_tokens_supported {
-                    conn
-                        .sender
-                        .send(Message::Request(lsp_server::Request {
-                            id: format!("doc-update-{}", update_cnt).into(),
-                            method: "workspace/semanticTokens/refresh".to_string(),
-                            params: serde_json::Value::Null,
-                        }))?;
-                }
+                let _ = update_um_file(
+                    um,
+                    &conn2,
+                    &mut ren_docs,
+                    semantic_tokens_supported,
+                    update_cnt,
+                )
+                .await;
             }
+        }
+    });
 
-            _ = doc_change_worker.make_progress() => {
-                // render document!
+    loop {
+        if let Ok(msg) = {
+            let conn = Arc::clone(&conn);
+            tokio::task::spawn_blocking(move || conn.receiver.recv().unwrap())
+        }
+        .await
+        {
+            let connection = Arc::clone(&conn);
+
+            match handle_msg(msg, &connection)? {
+                LspAction::SendSemanticTokens {
+                    id,
+                    params,
+                    file_path,
+                } => {
+                    let rendered_um = rendered_documents
+                        .read()
+                        .await
+                        .get(&Url::from_file_path(file_path).unwrap())
+                        .map(|rendered_um| (*rendered_um).clone());
+
+                    let resp = semantic_tokens::get_semantic_tokens(id, params, rendered_um);
+                    connection.sender.send(Message::Response(resp))?;
+                }
+                LspAction::UpdateDoc(params) => {
+                    tx_doc_change.send(params).await?;
+                    continue;
+                }
+                LspAction::OpenDoc(params) => {
+                    tx_doc_open.send(params).await?;
+                    continue;
+                }
+                LspAction::Shutdown => {
+                    tx_shutdown.send(true).await?;
+
+                    return Ok(());
+                }
+                LspAction::Continue => {}
             }
         }
     }
+}
+
+async fn update_um_file(
+    um: UnimarkupDocument,
+    conn: &Connection,
+    rendered_documents: &mut Arc<RwLock<HashMap<Url, UnimarkupDocument>>>,
+    semantic_tokens_supported: bool,
+    update_cnt: usize,
+) -> Result<(), Box<dyn Error + Sync + Send>> {
+    let file_id = Url::from_file_path(um.config.um_file.clone()).unwrap();
+    let rendered_content = RenderedContent {
+        id: file_id.clone(),
+        content: um.html().body(),
+    };
+
+    rendered_documents.write().await.insert(file_id, um);
+
+    let resp = lsp_server::Notification {
+        method: "extension/renderedContent".to_string(),
+        params: serde_json::to_value(rendered_content).unwrap(),
+    };
+
+    conn.sender.send(Message::Notification(resp))?;
+
+    if semantic_tokens_supported {
+        conn.sender.send(Message::Request(lsp_server::Request {
+            id: format!("doc-update-{}", update_cnt).into(),
+            method: "workspace/semanticTokens/refresh".to_string(),
+            params: serde_json::Value::Null,
+        }))?;
+    }
+
+    Ok(())
 }
 
 enum LspAction {
