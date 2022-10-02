@@ -79,7 +79,7 @@ pub(crate) struct OpenTokenModifier {
 pub(crate) enum TokenModifier {
     Bold,
     Italic,
-    BoldItalic,
+    // BoldItalic,
     Verbatim,
 }
 
@@ -111,8 +111,7 @@ impl TokenValue for TokenModifier {
         match self {
             TokenModifier::Bold => 1,
             TokenModifier::Italic => 1 << 1,
-            TokenModifier::BoldItalic => 3,
-            TokenModifier::Verbatim => 1 << 2,
+            TokenModifier::Verbatim => 3,
         }
     }
 }

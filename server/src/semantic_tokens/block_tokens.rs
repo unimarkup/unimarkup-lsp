@@ -43,14 +43,24 @@ impl SemanticBlockTokenizer for HeadingBlock {
             token_type: TokenType::Heading.value(),
             token_modifiers_bitset: 0,
         }];
-        tokens.append(&mut self.content.tokens(&TokenType::Heading, &mut vec![]));
+
+        tokens.append(
+            &mut self
+                .content
+                .iter()
+                .flat_map(|inline| inline.tokens(&TokenType::Heading, &mut vec![]))
+                .collect(),
+        );
         tokens
     }
 }
 
 impl SemanticBlockTokenizer for ParagraphBlock {
     fn tokens(&self, _open_types: &mut Vec<OpenTokenType>) -> Vec<SemanticToken> {
-        self.content.tokens(&TokenType::Paragraph, &mut vec![])
+        self.content
+            .iter()
+            .flat_map(|inline| inline.tokens(&TokenType::Paragraph, &mut vec![]))
+            .collect()
     }
 }
 
