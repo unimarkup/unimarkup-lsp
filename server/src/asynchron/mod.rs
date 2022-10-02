@@ -1,10 +1,11 @@
 use std::collections::HashMap;
 use std::error::Error;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::mpsc;
 use unimarkup_core::unimarkup::UnimarkupDocument;
 
-use lsp_server::{Connection, Message};
+use lsp_server::{Connection, Message, RequestId};
 use lsp_types::notification::DidOpenTextDocument;
 use lsp_types::request::SemanticTokensFullRequest;
 use lsp_types::{
@@ -73,66 +74,26 @@ async fn main_loop(
             } => {
                 let connection = Arc::clone(&conn);
 
-                match msg {
-                    Message::Request(req) => {
-                        if connection.handle_shutdown(&req).unwrap() {
-                            tx_shutdown.send(true).await?;
-                            doc_change_worker.make_progress().await;
-                            return Ok(());
-                        }
+                match handle_msg(msg, &connection)? {
+                    LspAction::SendSemanticTokens { id, params, file_path } => {
+                        let rendered_um = rendered_documents
+                            .get(&Url::from_file_path(file_path).unwrap())
+                            .map(|rendered_um| (*rendered_um).clone());
 
-                        match req.method.as_str() {
-                            SemanticTokensFullRequest::METHOD => {
-                                let resp;
-
-                                if let Ok((id, params)) = req
-                                    .extract::<SemanticTokensParams>(SemanticTokensFullRequest::METHOD)
-                                {
-                                    let file_path = params.text_document.uri.to_file_path().unwrap();
-
-                                    if let Some(rendered_um) =
-                                        rendered_documents.get(&Url::from_file_path(file_path).unwrap())
-                                    {
-                                        resp = semantic_tokens::get_semantic_tokens(
-                                            id,
-                                            params,
-                                            Some((*rendered_um).clone()),
-                                        );
-                                    } else {
-                                        resp = semantic_tokens::get_semantic_tokens(id, params, None);
-                                    }
-
-                                    connection.sender.send(Message::Response(resp))?;
-                                }
-                            }
-                            _ => {
-                                eprintln!("Unsupported request: {:?}", req);
-                            }
-                        }
-                    }
-                    Message::Response(resp) => {
-                        eprintln!("got response: {:?}", resp);
-                    }
-                    Message::Notification(notification) => match notification.method.as_str() {
-                        DidChangeTextDocument::METHOD => {
-                            if let Ok(params) = notification
-                                .extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
-                            {
-                                tx_doc_change.send(params).await?
-                            }
-                        }
-                        DidOpenTextDocument::METHOD => {
-                            if let Ok(params) = notification
-                                .extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
-                            {
-                                tx_doc_open.send(params).await?
-                            }
-                        }
-                        _ => {
-                            eprintln!("Unsupported notification: {:?}", notification);
-                        }
+                        let resp = semantic_tokens::get_semantic_tokens(id, params, rendered_um);
+                        connection.sender.send(Message::Response(resp))?;
                     },
+                    LspAction::UpdateDoc(params) => tx_doc_change.send(params).await?,
+                    LspAction::OpenDoc(params) => tx_doc_open.send(params).await?,
+                    LspAction::Shutdown => {
+                        doc_change_worker.make_progress().await;
+                        tx_shutdown.send(true).await?;
+
+                        return Ok(());
+                    },
+                    LspAction::Continue => {},
                 }
+
             },
 
             Some(um) = rx_um.recv() => {
@@ -167,5 +128,75 @@ async fn main_loop(
                 // render document!
             }
         }
+    }
+}
+
+enum LspAction {
+    SendSemanticTokens {
+        id: RequestId,
+        params: SemanticTokensParams,
+        file_path: PathBuf,
+    },
+    UpdateDoc(DidChangeTextDocumentParams),
+    OpenDoc(DidOpenTextDocumentParams),
+    Shutdown,
+    Continue,
+}
+
+fn handle_msg(
+    msg: Message,
+    connection: &Connection,
+) -> Result<LspAction, Box<dyn Error + Sync + Send>> {
+    match msg {
+        Message::Request(req) => {
+            if connection.handle_shutdown(&req).unwrap() {
+                Ok(LspAction::Shutdown)
+            } else if let SemanticTokensFullRequest::METHOD = req.method.as_str() {
+                if let Ok((id, params)) =
+                    req.extract::<SemanticTokensParams>(SemanticTokensFullRequest::METHOD)
+                {
+                    let file_path = params.text_document.uri.to_file_path().unwrap();
+
+                    Ok(LspAction::SendSemanticTokens {
+                        id,
+                        params,
+                        file_path,
+                    })
+                } else {
+                    Ok(LspAction::Continue)
+                }
+            } else {
+                eprintln!("Unsupported request: {:?}", req);
+                Ok(LspAction::Continue)
+            }
+        }
+        Message::Response(resp) => {
+            eprintln!("got response: {:?}", resp);
+            Ok(LspAction::Continue)
+        }
+        Message::Notification(notification) => match notification.method.as_str() {
+            DidChangeTextDocument::METHOD => {
+                if let Ok(params) = notification
+                    .extract::<DidChangeTextDocumentParams>(DidChangeTextDocument::METHOD)
+                {
+                    Ok(LspAction::UpdateDoc(params))
+                } else {
+                    Ok(LspAction::Continue)
+                }
+            }
+            DidOpenTextDocument::METHOD => {
+                if let Ok(params) =
+                    notification.extract::<DidOpenTextDocumentParams>(DidOpenTextDocument::METHOD)
+                {
+                    Ok(LspAction::OpenDoc(params))
+                } else {
+                    Ok(LspAction::Continue)
+                }
+            }
+            _ => {
+                eprintln!("Unsupported notification: {:?}", notification);
+                Ok(LspAction::Continue)
+            }
+        },
     }
 }
