@@ -17,7 +17,8 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, SemanticTokensParams, Url,
 };
 
-use crate::{capabilities, semantic_tokens, RenderedContent};
+use crate::sem_tokens::generate_semantic_tokens;
+use crate::{capabilities, RenderedContent};
 
 use self::doc_sync::DocChangeWorker;
 
@@ -105,7 +106,8 @@ async fn main_loop(
                         .get(&Url::from_file_path(file_path).unwrap())
                         .map(|rendered_um| (*rendered_um).clone());
 
-                    let resp = semantic_tokens::get_semantic_tokens(id, params, rendered_um);
+                    // let resp = semantic_tokens::get_semantic_tokens(id, params, rendered_um);
+                    let resp = generate_semantic_tokens(id, params, rendered_um);
                     connection.sender.send(Message::Response(resp))?;
                 }
                 LspAction::UpdateDoc(params) => {

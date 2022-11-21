@@ -5,6 +5,7 @@ use serde::Serialize;
 
 mod asynchron;
 mod capabilities;
+mod sem_tokens;
 mod semantic_tokens;
 mod sync;
 

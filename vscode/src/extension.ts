@@ -21,7 +21,7 @@ interface RenderedContent {
 }
 
 export function activate(context: ExtensionContext) {
-	let serverPath = getServerPath();
+  let serverPath = getServerPath();
   serverPath = context.asAbsolutePath(serverPath);
 
   let serverOptions: ServerOptions = {
@@ -31,13 +31,13 @@ export function activate(context: ExtensionContext) {
     }
   };
 
-	const traceOutputChannel = window.createOutputChannel(
-		'Unimarkup Language Server Trace',
-	);
+  const traceOutputChannel = window.createOutputChannel(
+    'Unimarkup Language Server Trace',
+  );
 
   let clientOptions: LanguageClientOptions = {
     documentSelector: [{ scheme: 'file', language: 'unimarkup' }],
-		traceOutputChannel
+    traceOutputChannel
   };
 
   client = new LanguageClient(
@@ -118,7 +118,9 @@ function updatePreview(uriFsPath: string | undefined, origContentEditor: TextEdi
   let content = renderedContents.get(uriFsPath);
   if (content !== undefined && activePreviewPanel !== undefined) {
     activePreviewPanel.id = uriFsPath;
-    activePreviewPanel.panel.webview.html = getWebviewContent(content, new PreviewState(activePreviewPanel.id));
+    const html = getWebviewContent(content, new PreviewState(activePreviewPanel.id));
+    console.log(html);
+    activePreviewPanel.panel.webview.html = html;
     activePreviewPanel.panel.title = getPreviewTitle(uriFsPath);
   }
 
@@ -146,7 +148,7 @@ class IdWebPanel {
     this.panel.onDidDispose(() => {
       previewPanels.delete(this);
     });
-  
+
     this.panel.onDidChangeViewState((panelEvent) => {
       if (panelEvent.webviewPanel.active && this !== activePreviewPanel) {
         activePreviewPanel = this;
@@ -204,7 +206,7 @@ async function createPreview(context: ExtensionContext, uriFsPath: string): Prom
   if (content === undefined) {
     content = getHtmlTemplate("<p>Loading</p>");
   }
-  
+
   const panel = window.createWebviewPanel(
     PANEL_VIEW_TYPE,
     'Unimarkup Preview',

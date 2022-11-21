@@ -41,33 +41,28 @@ impl SemanticInlineTokenizer for Inline {
                     delta_line: to_lsp_line_nr(self.span().start().line),
                     delta_start: self.span().start().column as u32,
                     length: delimiters.open().as_str().len() as u32,
-                    token_type: token_type.value(),
+                    token_type: TokenType::from(self).value(),
                     token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
                 }];
 
                 tokens.append(&mut nested.tokens(token_type, open_modifiers));
 
+                let closing_delim = delimiters
+                    .close()
+                    .expect("Could not unwrap non-existent closing tag");
+
                 tokens.push(SemanticToken {
                     delta_line: to_lsp_line_nr(self.span().end().line),
-                    delta_start: (self.span().end().column
-                        - delimiters
-                            .close()
-                            .unwrap_or(TokenKind::Plain)
-                            .as_str()
-                            .len()) as u32,
-                    length: delimiters
-                        .close()
-                        .unwrap_or(TokenKind::Plain)
-                        .as_str()
-                        .len() as u32,
-                    token_type: token_type.value(),
+                    delta_start: (self.span().end().column - closing_delim.as_str().len()) as u32,
+                    length: closing_delim.as_str().len() as u32,
+                    token_type: TokenType::from(self).value(),
                     token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
                 });
 
                 open_modifiers.pop();
                 tokens
             }
-            Inline::Plain(plain_content) => {
+            Inline::Plain(plain_content) | Inline::Verbatim(plain_content) => {
                 if token_type.value() != NO_TOKEN_TYPE || !open_modifiers.is_empty() {
                     vec![SemanticToken {
                         delta_line: to_lsp_line_nr(plain_content.span().start().line),
@@ -75,7 +70,7 @@ impl SemanticInlineTokenizer for Inline {
                         length: (plain_content.span().end().column
                             - plain_content.span().start().column)
                             as u32,
-                        token_type: token_type.value(),
+                        token_type: TokenType::from(self).value(),
                         token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
                     }]
                 } else {
@@ -119,17 +114,27 @@ impl SemanticInlineTokenizer for Inline {
     }
 }
 
-// impl TokenValue for InlineKind {
-//     fn value(&self) -> u32 {
-//         match self {
-//             InlineKind::Bold(_) => TokenModifier::Bold.value(),
-//             InlineKind::Italic(_) => TokenModifier::Italic.value(),
-//             InlineKind::BoldItalic(_) => TokenModifier::BoldItalic.value(),
-//             InlineKind::Verbatim(_) => TokenModifier::Verbatim.value(),
-//             _ => NO_TOKEN_TYPE,
-//         }
-//     }
-// }
+impl TokenValue for Inline {
+    fn value(&self) -> u32 {
+        match self {
+            Inline::Bold(_) => 3,
+            Inline::Italic(_) => TokenModifier::Italic.value(),
+            Inline::Verbatim(_) => TokenModifier::Verbatim.value(),
+            _ => NO_TOKEN_TYPE,
+        }
+    }
+}
+
+impl From<&Inline> for TokenType {
+    fn from(inline: &Inline) -> Self {
+        match *inline {
+            Inline::Bold(_) => TokenType::Bold,
+            Inline::Italic(_) => TokenType::Italic,
+            Inline::Verbatim(_) => TokenType::VerbatimBlock,
+            _ => TokenType::Paragraph,
+        }
+    }
+}
 
 impl From<&Inline> for OpenTokenModifier {
     fn from(inline: &Inline) -> Self {
