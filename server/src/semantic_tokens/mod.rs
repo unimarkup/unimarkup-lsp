@@ -54,6 +54,8 @@ pub(crate) enum TokenType {
     Heading,
     Paragraph,
     VerbatimBlock,
+    Bold,
+    Italic,
 }
 
 impl Default for TokenType {
@@ -101,6 +103,8 @@ impl TokenValue for TokenType {
             TokenType::Paragraph => 21,
             TokenType::Heading => 3,
             TokenType::VerbatimBlock => 18,
+            TokenType::Bold => 3,
+            TokenType::Italic => 18,
         }
     }
 }

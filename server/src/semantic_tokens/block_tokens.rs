@@ -51,7 +51,8 @@ impl SemanticBlockTokenizer for HeadingBlock {
                 .flat_map(|inline| inline.tokens(&TokenType::Heading, &mut vec![]))
                 .collect(),
         );
-        tokens
+
+        dbg!(tokens)
     }
 }
 

@@ -12,7 +12,10 @@
 			},
 			"problemMatcher": {
 				"base": "$tsc",
-				"fileLocation": ["relative", "${workspaceFolder}"]
+				"fileLocation": [
+					"relative",
+					"${workspaceFolder}"
+				]
 			}
 		},
 		{
@@ -30,18 +33,21 @@
 			},
 			"problemMatcher": {
 				"base": "$tsc-watch",
-				"fileLocation": ["relative", "${workspaceFolder}"]
+				"fileLocation": [
+					"relative",
+					"${workspaceFolder}"
+				]
 			}
 		},
-    {
-      "label": "Build Server",
-      "group": "build",
-      "type": "shell",
+		{
+			"label": "Build Server",
+			"group": "build",
+			"type": "shell",
 			"options": {
 				"cwd": "${workspaceFolder}/server/"
 			},
-      "command": "cargo build --package unimarkup_ls; cp target\\debug\\unimarkup_ls* ..\\vscode\\server_bin",
-      "problemMatcher": "$rustc"
-    }
+			"command": "cargo build --package unimarkup_ls; cp target/debug/unimarkup_ls* ../vscode/server_bin",
+			"problemMatcher": "$rustc"
+		}
 	]
 }

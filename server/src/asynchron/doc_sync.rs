@@ -36,13 +36,12 @@ impl DocChangeWorker {
             if let Some(opened_doc) = rx_doc_open.recv().await {
                 config.um_file = opened_doc.text_document.uri.to_file_path().unwrap();
 
-                let rendered_doc = unimarkup_core::unimarkup::compile(
+                if let Ok(rendered_doc) = unimarkup_core::unimarkup::compile(
                     &opened_doc.text_document.text.clone(),
                     config.clone(),
-                )
-                .unwrap();
-
-                let _ = tx_um.send(rendered_doc).await;
+                ) {
+                    let _ = tx_um.send(rendered_doc).await;
+                }
             }
         }
     }
@@ -56,13 +55,12 @@ impl DocChangeWorker {
             if let Some(changes) = rx_doc_change.recv().await {
                 config.um_file = changes.text_document.uri.to_file_path().unwrap();
 
-                let rendered_doc = unimarkup_core::unimarkup::compile(
+                if let Ok(rendered_doc) = unimarkup_core::unimarkup::compile(
                     &changes.content_changes[0].text.clone(),
                     config.clone(),
-                )
-                .unwrap();
-
-                let _ = tx_um.send(rendered_doc).await;
+                ) {
+                    let _ = tx_um.send(rendered_doc).await;
+                }
             }
         }
     }
