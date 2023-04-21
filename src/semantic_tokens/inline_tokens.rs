@@ -130,7 +130,7 @@ impl From<&Inline> for TokenType {
         match *inline {
             Inline::Bold(_) => TokenType::Bold,
             Inline::Italic(_) => TokenType::Italic,
-            Inline::Verbatim(_) => TokenType::VerbatimBlock,
+            Inline::Verbatim(_) => TokenType::Verbatim,
             _ => TokenType::Paragraph,
         }
     }

@@ -1,8 +1,8 @@
 use lsp_types::SemanticToken;
 use unimarkup_core::{
-    elements::{HeadingBlock, ParagraphBlock, VerbatimBlock},
-    unimarkup::UnimarkupDocument,
-    unimarkup_block::UnimarkupBlockKind,
+    elements::{atomic::Heading, atomic::Paragraph, enclosed::Verbatim},
+    document::Document,
+    elements::blocks::Block,
 };
 
 use super::{
@@ -14,27 +14,28 @@ pub(crate) trait SemanticBlockTokenizer {
     fn tokens(&self, open_types: &mut Vec<OpenTokenType>) -> Vec<SemanticToken>;
 }
 
-impl SemanticBlockTokenizer for UnimarkupDocument {
+impl SemanticBlockTokenizer for Document {
     fn tokens(&self, open_types: &mut Vec<OpenTokenType>) -> Vec<SemanticToken> {
         let mut tokens = Vec::<SemanticToken>::new();
-        for block in &self.elements {
+        for block in &self.blocks {
             tokens.append(&mut block.tokens(open_types));
         }
         tokens
     }
 }
 
-impl SemanticBlockTokenizer for UnimarkupBlockKind {
+impl SemanticBlockTokenizer for Block {
     fn tokens(&self, open_types: &mut Vec<OpenTokenType>) -> Vec<SemanticToken> {
         match self {
-            UnimarkupBlockKind::Heading(heading) => heading.tokens(open_types),
-            UnimarkupBlockKind::Paragraph(paragraph) => paragraph.tokens(open_types),
-            UnimarkupBlockKind::Verbatim(verbatim) => verbatim.tokens(open_types),
+            Block::Heading(heading) => heading.tokens(open_types),
+            Block::Paragraph(paragraph) => paragraph.tokens(open_types),
+            Block::Verbatim(verbatim) => verbatim.tokens(open_types),
+            _ => todo!(),
         }
     }
 }
 
-impl SemanticBlockTokenizer for HeadingBlock {
+impl SemanticBlockTokenizer for Heading {
     fn tokens(&self, open_types: &mut Vec<OpenTokenType>) -> Vec<SemanticToken> {
         let mut tokens = vec![SemanticToken {
             delta_line: to_lsp_line_nr(self.line_nr),
@@ -56,7 +57,7 @@ impl SemanticBlockTokenizer for HeadingBlock {
     }
 }
 
-impl SemanticBlockTokenizer for ParagraphBlock {
+impl SemanticBlockTokenizer for Paragraph {
     fn tokens(&self, _open_types: &mut Vec<OpenTokenType>) -> Vec<SemanticToken> {
         self.content
             .iter()
@@ -65,14 +66,14 @@ impl SemanticBlockTokenizer for ParagraphBlock {
     }
 }
 
-impl SemanticBlockTokenizer for VerbatimBlock {
+impl SemanticBlockTokenizer for Verbatim {
     fn tokens(&self, _open_types: &mut Vec<OpenTokenType>) -> Vec<SemanticToken> {
-        //TODO: Change length after VerbatimBlock contains needed information
+        //TODO: Change length after Verbatim contains needed information
         let mut tokens = vec![SemanticToken {
             delta_line: to_lsp_line_nr(self.line_nr),
             delta_start: 0,
             length: 50,
-            token_type: TokenType::VerbatimBlock.value(),
+            token_type: TokenType::Verbatim.value(),
             token_modifiers_bitset: 0,
         }];
 
@@ -82,7 +83,7 @@ impl SemanticBlockTokenizer for VerbatimBlock {
                 delta_line: to_lsp_line_nr(self.line_nr + i + 1),
                 delta_start: 0,
                 length: (line.len() as u32),
-                token_type: TokenType::VerbatimBlock.value(),
+                token_type: TokenType::Verbatim.value(),
                 token_modifiers_bitset: 0,
             });
         }
@@ -91,7 +92,7 @@ impl SemanticBlockTokenizer for VerbatimBlock {
             delta_line: to_lsp_line_nr(self.line_nr + self.content.lines().count() + 1),
             delta_start: 0,
             length: 50,
-            token_type: TokenType::VerbatimBlock.value(),
+            token_type: TokenType::Verbatim.value(),
             token_modifiers_bitset: 0,
         });
 

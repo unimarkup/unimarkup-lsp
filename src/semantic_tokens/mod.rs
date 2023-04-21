@@ -4,7 +4,7 @@ use lsp_types::SemanticToken;
 use lsp_types::SemanticTokens;
 use lsp_types::SemanticTokensParams;
 use lsp_types::SemanticTokensResult;
-use unimarkup_core::unimarkup::UnimarkupDocument;
+use unimarkup_core::document::Document;
 
 use self::block_tokens::SemanticBlockTokenizer;
 
@@ -15,7 +15,7 @@ mod inline_tokens;
 pub fn get_semantic_tokens(
     id: RequestId,
     _params: SemanticTokensParams,
-    rendered_um: Option<UnimarkupDocument>,
+    rendered_um: Option<Document>,
 ) -> Response {
     let mut tokens = SemanticTokens {
         result_id: Some(id.to_string()),
@@ -49,19 +49,14 @@ pub(crate) struct OpenTokenType {
     length: Option<u32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub(crate) enum TokenType {
     Heading,
+    #[default]
     Paragraph,
-    VerbatimBlock,
+    Verbatim,
     Bold,
     Italic,
-}
-
-impl Default for TokenType {
-    fn default() -> Self {
-        TokenType::Paragraph
-    }
 }
 
 #[derive(Debug, Default, Clone)]
@@ -77,18 +72,13 @@ pub(crate) struct OpenTokenModifier {
     _start_column_offset: u32,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub(crate) enum TokenModifier {
+    #[default]
     Bold,
     Italic,
     // BoldItalic,
     Verbatim,
-}
-
-impl Default for TokenModifier {
-    fn default() -> Self {
-        TokenModifier::Bold
-    }
 }
 
 const NO_TOKEN_TYPE: u32 = u32::max_value();
@@ -102,7 +92,7 @@ impl TokenValue for TokenType {
         match self {
             TokenType::Paragraph => 21,
             TokenType::Heading => 3,
-            TokenType::VerbatimBlock => 18,
+            TokenType::Verbatim => 18,
             TokenType::Bold => 3,
             TokenType::Italic => 18,
         }

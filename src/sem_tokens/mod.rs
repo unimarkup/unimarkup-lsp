@@ -3,9 +3,9 @@ mod token_type;
 use lsp_server::{RequestId, Response};
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensResult};
 use unimarkup_core::{
-    elements::{HeadingBlock, ParagraphBlock, VerbatimBlock},
-    unimarkup::UnimarkupDocument,
-    unimarkup_block::UnimarkupBlockKind,
+    elements::{atomic::Heading, atomic::Paragraph, enclosed::Verbatim},
+    document::Document,
+    elements::blocks::Block,
 };
 use unimarkup_inline::{Inline, NestedContent, PlainContent};
 
@@ -14,7 +14,7 @@ use self::token_type::TokenType;
 pub fn generate_semantic_tokens(
     id: RequestId,
     _params: SemanticTokensParams,
-    rendered_um: Option<UnimarkupDocument>,
+    rendered_um: Option<&Document>,
 ) -> Response {
     let mut tokens = SemanticTokens {
         result_id: Some(id.to_string()),
@@ -91,26 +91,27 @@ trait Tokenize {
     fn tokens(&self) -> Vec<AbsoluteSemanticToken>;
 }
 
-impl Tokenize for UnimarkupDocument {
+impl Tokenize for Document {
     fn tokens(&self) -> Vec<AbsoluteSemanticToken> {
-        self.elements
+        self.blocks
             .iter()
-            .flat_map(|um_element| um_element.tokens())
+            .flat_map(|block| block.tokens())
             .collect()
     }
 }
 
-impl Tokenize for UnimarkupBlockKind {
+impl Tokenize for Block {
     fn tokens(&self) -> Vec<AbsoluteSemanticToken> {
         match self {
-            UnimarkupBlockKind::Heading(block) => block.tokens(),
-            UnimarkupBlockKind::Paragraph(block) => block.tokens(),
-            UnimarkupBlockKind::Verbatim(block) => block.tokens(),
+            Block::Heading(block) => block.tokens(),
+            Block::Paragraph(block) => block.tokens(),
+            Block::Verbatim(block) => block.tokens(),
+            _ => todo!(),
         }
     }
 }
 
-impl Tokenize for HeadingBlock {
+impl Tokenize for Heading {
     fn tokens(&self) -> Vec<AbsoluteSemanticToken> {
         let heading_token = AbsoluteSemanticToken {
             line: self.line_nr,
@@ -126,7 +127,7 @@ impl Tokenize for HeadingBlock {
     }
 }
 
-impl Tokenize for ParagraphBlock {
+impl Tokenize for Paragraph {
     fn tokens(&self) -> Vec<AbsoluteSemanticToken> {
         dbg!(self
             .content
@@ -140,7 +141,7 @@ impl Tokenize for ParagraphBlock {
     }
 }
 
-impl Tokenize for VerbatimBlock {
+impl Tokenize for Verbatim {
     fn tokens(&self) -> Vec<AbsoluteSemanticToken> {
         let start_line = self.line_nr;
 

@@ -4,13 +4,13 @@ use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
 use unimarkup_core::config::Config;
 use unimarkup_core::config::OutputFormat;
-use unimarkup_core::unimarkup::UnimarkupDocument;
+use unimarkup_core::document::Document;
 
 pub(crate) struct DocChangeWorker;
 
 impl DocChangeWorker {
     pub(crate) fn init(
-        tx_um: Sender<UnimarkupDocument>,
+        tx_um: Sender<Document>,
         rx_doc_open: Receiver<DidOpenTextDocumentParams>,
         rx_doc_change: Receiver<DidChangeTextDocumentParams>,
     ) {
@@ -28,7 +28,7 @@ impl DocChangeWorker {
     }
 
     async fn doc_open_loop(
-        tx_um: Sender<UnimarkupDocument>,
+        tx_um: Sender<Document>,
         mut rx_doc_open: Receiver<DidOpenTextDocumentParams>,
         mut config: Config,
     ) {
@@ -47,7 +47,7 @@ impl DocChangeWorker {
     }
 
     async fn doc_change_loop(
-        tx_um: Sender<UnimarkupDocument>,
+        tx_um: Sender<Document>,
         mut rx_doc_change: Receiver<DidChangeTextDocumentParams>,
         mut config: Config,
     ) {
