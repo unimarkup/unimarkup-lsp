@@ -1,9 +1,0 @@
-{
-	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
-	"name": "Unimarkup",
-	"patterns": [
-	],
-	"repository": {
-	},
-	"scopeName": "source.unimarkup"
-}
