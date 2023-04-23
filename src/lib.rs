@@ -18,8 +18,8 @@ use lsp_types::{
 };
 use serde::Serialize;
 
-use self::semantic_tokens::get_semantic_tokens_response;
 use self::doc_sync::DocChangeWorker;
+use self::semantic_tokens::get_semantic_tokens_response;
 
 mod capabilities;
 mod doc_sync;

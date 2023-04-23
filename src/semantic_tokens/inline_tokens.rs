@@ -1,9 +1,7 @@
 use lsp_types::SemanticToken;
 use unimarkup_inline::{Inline, NestedContent, TokenDelimiters, TokenKind};
 
-use super::{
-    block_tokens::TokenType, TokenValue,
-};
+use super::{block_tokens::TokenType, TokenValue};
 
 #[derive(Debug, Default, Clone)]
 pub(crate) struct OpenTokenModifier {
@@ -38,17 +36,11 @@ impl TokenValue for TokenModifier {
 }
 
 pub(crate) trait SemanticInlineTokenizer {
-    fn tokens(
-        &self,
-        open_modifiers: &mut Vec<OpenTokenModifier>,
-    ) -> Vec<SemanticToken>;
+    fn tokens(&self, open_modifiers: &mut Vec<OpenTokenModifier>) -> Vec<SemanticToken>;
 }
 
 impl SemanticInlineTokenizer for NestedContent {
-    fn tokens(
-        &self,
-        open_modifiers: &mut Vec<OpenTokenModifier>,
-    ) -> Vec<SemanticToken> {
+    fn tokens(&self, open_modifiers: &mut Vec<OpenTokenModifier>) -> Vec<SemanticToken> {
         self.iter()
             .flat_map(|inline| inline.tokens(open_modifiers))
             .collect()
@@ -56,10 +48,7 @@ impl SemanticInlineTokenizer for NestedContent {
 }
 
 impl SemanticInlineTokenizer for Inline {
-    fn tokens(
-        &self,
-        open_modifiers: &mut Vec<OpenTokenModifier>,
-    ) -> Vec<SemanticToken> {
+    fn tokens(&self, open_modifiers: &mut Vec<OpenTokenModifier>) -> Vec<SemanticToken> {
         match self {
             Inline::Bold(nested) | Inline::Italic(nested) => {
                 open_modifiers.push(self.into());
@@ -81,7 +70,8 @@ impl SemanticInlineTokenizer for Inline {
 
                 tokens.push(SemanticToken {
                     delta_line: self.span().end().line as u32,
-                    delta_start: (self.span().end().column + 1 - closing_delim.as_str().len()) as u32,
+                    delta_start: (self.span().end().column + 1 - closing_delim.as_str().len())
+                        as u32,
                     length: closing_delim.as_str().len() as u32,
                     token_type: TokenType::default().value(),
                     token_modifiers_bitset: get_modifier_bitfield(open_modifiers),

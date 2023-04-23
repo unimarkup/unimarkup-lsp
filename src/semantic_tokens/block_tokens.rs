@@ -5,9 +5,7 @@ use unimarkup_core::{
     elements::{atomic::Heading, atomic::Paragraph, enclosed::Verbatim},
 };
 
-use super::{
-    inline_tokens::SemanticInlineTokenizer, TokenValue,
-};
+use super::{inline_tokens::SemanticInlineTokenizer, TokenValue};
 
 #[derive(Default, Debug, Clone)]
 pub(crate) enum TokenType {
@@ -20,7 +18,7 @@ pub(crate) enum TokenType {
 impl TokenValue for TokenType {
     fn value(&self) -> u32 {
         match self {
-            TokenType::Paragraph => 2,//21,
+            TokenType::Paragraph => 2, //21,
             TokenType::Heading => 3,
             TokenType::Verbatim => 18,
         }

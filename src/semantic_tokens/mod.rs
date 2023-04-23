@@ -69,12 +69,12 @@ fn make_relative(mut tokens: Vec<SemanticToken>) -> Vec<SemanticToken> {
                     token.delta_start -= next_token.delta_start;
                 } else {
                     token.delta_start -= 1;
-                }              
+                }
             }
         } else {
             token.delta_start -= 1;
             token.delta_line -= 1;
-        }  
+        }
     }
 
     sorted_tokens.reverse();
