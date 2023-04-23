@@ -3,9 +3,9 @@ mod token_type;
 use lsp_server::{RequestId, Response};
 use lsp_types::{SemanticToken, SemanticTokens, SemanticTokensParams, SemanticTokensResult};
 use unimarkup_core::{
-    elements::{atomic::Heading, atomic::Paragraph, enclosed::Verbatim},
     document::Document,
     elements::blocks::Block,
+    elements::{atomic::Heading, atomic::Paragraph, enclosed::Verbatim},
 };
 use unimarkup_inline::{Inline, NestedContent, PlainContent};
 

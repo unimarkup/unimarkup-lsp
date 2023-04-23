@@ -12,22 +12,25 @@ mod block_tokens;
 mod delta_conversions;
 mod inline_tokens;
 
-pub fn get_semantic_tokens(
+trait TokenValue {
+    fn value(&self) -> u32;
+}
+
+pub fn get_semantic_tokens_response(
     id: RequestId,
     _params: SemanticTokensParams,
-    rendered_um: Option<Document>,
+    document: Option<&Document>,
 ) -> Response {
     let mut tokens = SemanticTokens {
         result_id: Some(id.to_string()),
         ..Default::default()
     };
 
-    if let Some(um_doc) = rendered_um {
-        tokens.data = make_relative(um_doc.tokens(&mut vec![]));
+    if let Some(um_doc) = document {
+        tokens.data = get_semantic_tokens(um_doc);
     }
 
     let result = Some(SemanticTokensResult::Tokens(tokens));
-
     let result = serde_json::to_value(&result).unwrap();
     Response {
         id,
@@ -36,78 +39,8 @@ pub fn get_semantic_tokens(
     }
 }
 
-#[derive(Debug, Default, Clone)]
-pub(crate) struct OpenTokenType {
-    /// The open token type
-    _token_type: TokenType,
-    /// Column offset the content of this type starts.
-    /// Needed for nested blocks.
-    ///
-    /// e.g. verbatim inside list
-    start_column_offset: u32,
-    /// The type length, or None, if the type goes to end of line
-    length: Option<u32>,
-}
-
-#[derive(Default, Debug, Clone)]
-pub(crate) enum TokenType {
-    Heading,
-    #[default]
-    Paragraph,
-    Verbatim,
-    Bold,
-    Italic,
-}
-
-#[derive(Debug, Default, Clone)]
-pub(crate) struct OpenTokenModifier {
-    /// The open token modifier
-    token_modifier: TokenModifier,
-    /// Column start of the modifier
-    _start_column: u32,
-    /// Column offset the content of this modifier starts.
-    /// Needed for nested blocks.
-    ///
-    /// e.g. verbatim inside list
-    _start_column_offset: u32,
-}
-
-#[derive(Default, Debug, Clone)]
-pub(crate) enum TokenModifier {
-    #[default]
-    Bold,
-    Italic,
-    // BoldItalic,
-    Verbatim,
-}
-
-const NO_TOKEN_TYPE: u32 = u32::max_value();
-
-trait TokenValue {
-    fn value(&self) -> u32;
-}
-
-impl TokenValue for TokenType {
-    fn value(&self) -> u32 {
-        match self {
-            TokenType::Paragraph => 21,
-            TokenType::Heading => 3,
-            TokenType::Verbatim => 18,
-            TokenType::Bold => 3,
-            TokenType::Italic => 18,
-        }
-    }
-}
-
-impl TokenValue for TokenModifier {
-    fn value(&self) -> u32 {
-        // Note: These values must set the correct modifier bit
-        match self {
-            TokenModifier::Bold => 1,
-            TokenModifier::Italic => 1 << 1,
-            TokenModifier::Verbatim => 3,
-        }
-    }
+pub fn get_semantic_tokens(document: &Document) -> Vec<SemanticToken> {
+    make_relative(document.tokens())
 }
 
 /// Brings all tokens in relative position offsets
@@ -125,6 +58,9 @@ fn make_relative(mut tokens: Vec<SemanticToken>) -> Vec<SemanticToken> {
         std::cmp::Ordering::Equal
     });
 
+    // Note: unimarkup positions start with line = 1 and column = 1
+    // LSP positions start with line = 0 and column = 0
+    // => `-1` to correct this
     let mut sorted_tokens = tokens.clone();
     for (i, token) in sorted_tokens.iter_mut().enumerate() {
         if i < tokens.len() - 1 {
@@ -132,9 +68,14 @@ fn make_relative(mut tokens: Vec<SemanticToken>) -> Vec<SemanticToken> {
                 token.delta_line -= next_token.delta_line;
                 if token.delta_line == 0 {
                     token.delta_start -= next_token.delta_start;
-                }
+                } else {
+                    token.delta_start -= 1;
+                }              
             }
-        }
+        } else {
+            token.delta_start -= 1;
+            token.delta_line -= 1;
+        }  
     }
 
     sorted_tokens.reverse();

@@ -18,15 +18,13 @@ use lsp_types::{
 };
 use serde::Serialize;
 
-use crate::sem_tokens::generate_semantic_tokens;
-
+use self::semantic_tokens::get_semantic_tokens_response;
 use self::doc_sync::DocChangeWorker;
 
-
 mod capabilities;
-mod sem_tokens;
-mod semantic_tokens;
 mod doc_sync;
+mod sem_tokens;
+pub mod semantic_tokens;
 
 #[derive(Debug, Clone, Serialize)]
 struct RenderedContent {
@@ -110,13 +108,10 @@ async fn main_loop(
                     params,
                     file_path,
                 } => {
-                    let documents = parsed_documents
-                    .read()
-                    .await;
-                    let document = documents
-                        .get(&Url::from_file_path(file_path).unwrap());
+                    let documents = parsed_documents.read().await;
+                    let document = documents.get(&Url::from_file_path(file_path).unwrap());
 
-                    let resp = generate_semantic_tokens(id, params, document);
+                    let resp = get_semantic_tokens_response(id, params, document);
                     connection.sender.send(Message::Response(resp))?;
                 }
                 LspAction::UpdateDoc(params) => {
