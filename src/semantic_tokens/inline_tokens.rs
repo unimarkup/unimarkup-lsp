@@ -94,7 +94,7 @@ impl SemanticInlineTokenizer for Inline {
                 vec![SemanticToken {
                     delta_line: plain_content.span().start().line as u32,
                     delta_start: plain_content.span().start().column as u32,
-                    length: plain_content.content_len() as u32,
+                    length: (plain_content.content_len() + 2) as u32, // +2 for delimiters
                     token_type: TokenType::Verbatim.value(),
                     token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
                 }]
