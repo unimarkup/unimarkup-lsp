@@ -23,7 +23,6 @@ use self::doc_sync::DocChangeWorker;
 
 mod capabilities;
 mod doc_sync;
-mod sem_tokens;
 pub mod semantic_tokens;
 
 #[derive(Debug, Clone, Serialize)]
