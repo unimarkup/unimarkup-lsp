@@ -1,2 +1,9 @@
 # unimarkup-lsp
-Language Server Protocol implementation for Unimarkup
+
+Language Server Protocol implementation for Unimarkup.
+
+**WIP**
+
+# License
+
+MIT Licensed

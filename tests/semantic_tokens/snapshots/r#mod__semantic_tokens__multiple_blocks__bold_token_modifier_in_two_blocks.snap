@@ -1,0 +1,48 @@
+---
+source: tests/semantic_tokens/multiple_blocks.rs
+expression: "format!(\"{:#?}\", tokens)"
+---
+[
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 0,
+        length: 2,
+        token_type: 2,
+        token_modifiers_bitset: 1,
+    },
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 2,
+        length: 9,
+        token_type: 2,
+        token_modifiers_bitset: 1,
+    },
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 9,
+        length: 2,
+        token_type: 2,
+        token_modifiers_bitset: 1,
+    },
+    SemanticToken {
+        delta_line: 2,
+        delta_start: 0,
+        length: 2,
+        token_type: 2,
+        token_modifiers_bitset: 1,
+    },
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 2,
+        length: 15,
+        token_type: 2,
+        token_modifiers_bitset: 1,
+    },
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 15,
+        length: 2,
+        token_type: 2,
+        token_modifiers_bitset: 1,
+    },
+]

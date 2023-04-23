@@ -1,0 +1,27 @@
+---
+source: tests/semantic_tokens/inline_tokens.rs
+expression: "format!(\"{:#?}\", tokens)"
+---
+[
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 0,
+        length: 1,
+        token_type: 2,
+        token_modifiers_bitset: 2,
+    },
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 1,
+        length: 11,
+        token_type: 2,
+        token_modifiers_bitset: 2,
+    },
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 11,
+        length: 1,
+        token_type: 2,
+        token_modifiers_bitset: 2,
+    },
+]

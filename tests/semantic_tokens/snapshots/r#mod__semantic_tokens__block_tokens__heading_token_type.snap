@@ -1,0 +1,13 @@
+---
+source: tests/semantic_tokens/block_tokens.rs
+expression: "format!(\"{:#?}\", tokens)"
+---
+[
+    SemanticToken {
+        delta_line: 0,
+        delta_start: 0,
+        length: 1,
+        token_type: 3,
+        token_modifiers_bitset: 0,
+    },
+]

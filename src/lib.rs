@@ -3,7 +3,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use unimarkup_core::unimarkup::UnimarkupDocument;
+use unimarkup_core::document::Document;
 
 use lsp_server::{Connection, Message, RequestId};
 use lsp_types::notification::DidOpenTextDocument;
@@ -16,19 +16,26 @@ use lsp_types::{
 use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, SemanticTokensParams, Url,
 };
-
-use crate::sem_tokens::generate_semantic_tokens;
-use crate::{capabilities, RenderedContent};
+use serde::Serialize;
 
 use self::doc_sync::DocChangeWorker;
+use self::semantic_tokens::get_semantic_tokens_response;
 
+mod capabilities;
 mod doc_sync;
+pub mod semantic_tokens;
 
-pub(crate) fn run() -> Result<(), Box<dyn Error + Sync + Send>> {
+#[derive(Debug, Clone, Serialize)]
+struct RenderedContent {
+    id: Url,
+    content: String,
+}
+
+pub fn run() -> Result<(), Box<dyn Error + Sync + Send>> {
     let (connection, io_threads) = Connection::stdio();
 
     let serialized_server_capabilities =
-        serde_json::to_value(&capabilities::get_capabilities()).unwrap();
+        serde_json::to_value(capabilities::get_capabilities()).unwrap();
 
     let initialization_params = connection.initialize(serialized_server_capabilities)?;
 
@@ -54,12 +61,12 @@ async fn main_loop(
         semantic_tokens_supported = workspace_capabilities.semantic_tokens.is_some();
     }
 
-    let (tx_um, mut rx_um) = mpsc::channel::<UnimarkupDocument>(10);
+    let (tx_um, mut rx_um) = mpsc::channel::<Document>(10);
     let (tx_doc_open, rx_doc_open) = mpsc::channel::<DidOpenTextDocumentParams>(10);
     let (tx_doc_change, rx_doc_change) = mpsc::channel::<DidChangeTextDocumentParams>(10);
     let (tx_shutdown, _rx_shutdown) = mpsc::channel::<bool>(10);
 
-    let rendered_documents: Arc<RwLock<HashMap<Url, UnimarkupDocument>>> =
+    let parsed_documents: Arc<RwLock<HashMap<Url, Document>>> =
         Arc::new(RwLock::new(HashMap::new()));
     let mut update_cnt = 0;
 
@@ -68,7 +75,7 @@ async fn main_loop(
     DocChangeWorker::init(tx_um, rx_doc_open, rx_doc_change);
 
     let conn2 = Arc::clone(&conn);
-    let mut ren_docs = Arc::clone(&rendered_documents);
+    let mut ren_docs = Arc::clone(&parsed_documents);
     tokio::spawn(async move {
         loop {
             if let Some(um) = rx_um.recv().await {
@@ -100,14 +107,10 @@ async fn main_loop(
                     params,
                     file_path,
                 } => {
-                    let rendered_um = rendered_documents
-                        .read()
-                        .await
-                        .get(&Url::from_file_path(file_path).unwrap())
-                        .map(|rendered_um| (*rendered_um).clone());
+                    let documents = parsed_documents.read().await;
+                    let document = documents.get(&Url::from_file_path(file_path).unwrap());
 
-                    // let resp = semantic_tokens::get_semantic_tokens(id, params, rendered_um);
-                    let resp = generate_semantic_tokens(id, params, rendered_um);
+                    let resp = get_semantic_tokens_response(id, params, document);
                     connection.sender.send(Message::Response(resp))?;
                 }
                 LspAction::UpdateDoc(params) => {
@@ -130,16 +133,16 @@ async fn main_loop(
 }
 
 async fn update_um_file(
-    um: UnimarkupDocument,
+    um: Document,
     conn: &Connection,
-    rendered_documents: &mut Arc<RwLock<HashMap<Url, UnimarkupDocument>>>,
+    rendered_documents: &mut Arc<RwLock<HashMap<Url, Document>>>,
     semantic_tokens_supported: bool,
     update_cnt: usize,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
     let file_id = Url::from_file_path(um.config.um_file.clone()).unwrap();
     let rendered_content = RenderedContent {
         id: file_id.clone(),
-        content: um.html().body(),
+        content: um.html().body,
     };
 
     rendered_documents.write().await.insert(file_id, um);
