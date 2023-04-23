@@ -2,6 +2,12 @@
 name = "unimarkup-lsp"
 version = "0.1.0"
 edition = "2021"
+authors = ["Manuel Hatzl", "Nadir Fejzić"]
+description = "Language server for Unimarkup."
+repository = "https://github.com/unimarkup/unimarkup-lsp"
+homepage = "https://github.com/unimarkup/unimarkup-lsp"
+readme = "README.md"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
