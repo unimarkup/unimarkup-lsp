@@ -2,7 +2,7 @@ use lsp_types::SemanticToken;
 use unimarkup_inline::{Inline, NestedContent, TokenDelimiters, TokenKind};
 
 use super::{
-    block_tokens::TokenType, delta_conversions::to_lsp_line_nr, TokenValue,
+    block_tokens::TokenType, TokenValue,
 };
 
 #[derive(Debug, Default, Clone)]
@@ -24,7 +24,6 @@ pub(crate) enum TokenModifier {
     Plain,
     Bold,
     Italic,
-    Verbatim,
 }
 
 impl TokenValue for TokenModifier {
@@ -34,7 +33,6 @@ impl TokenValue for TokenModifier {
             TokenModifier::Plain => 0,
             TokenModifier::Bold => 1,
             TokenModifier::Italic => 1 << 1,
-            TokenModifier::Verbatim => 3,
         }
     }
 }
@@ -93,22 +91,15 @@ impl SemanticInlineTokenizer for Inline {
                 tokens
             }
             Inline::Verbatim(plain_content) => {
-                open_modifiers.push(self.into());
-
-                let tokens = vec![SemanticToken {
+                vec![SemanticToken {
                     delta_line: plain_content.span().start().line as u32,
                     delta_start: plain_content.span().start().column as u32,
                     length: plain_content.content_len() as u32,
-                    token_type: TokenType::default().value(),
+                    token_type: TokenType::Verbatim.value(),
                     token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
-                }];
-
-                open_modifiers.pop();
-
-                tokens
+                }]
             }
             Inline::Plain(plain_content) => {
-                dbg!(plain_content.span().start().line);
                 if !open_modifiers.is_empty() {
                     vec![SemanticToken {
                         delta_line: plain_content.span().start().line as u32,
@@ -135,7 +126,7 @@ impl SemanticInlineTokenizer for Inline {
                 tokens.append(&mut nested.tokens(open_modifiers));
 
                 tokens.push(SemanticToken {
-                    delta_line: to_lsp_line_nr(nested.span().end().line),
+                    delta_line: nested.span().end().line as u32,
                     delta_start: (nested.span().end().column
                         - delimiters
                             .close()
@@ -163,22 +154,10 @@ impl TokenValue for Inline {
         match self {
             Inline::Bold(_) => TokenModifier::Bold.value(),
             Inline::Italic(_) => TokenModifier::Italic.value(),
-            Inline::Verbatim(_) => TokenModifier::Verbatim.value(),
             _ => TokenModifier::default().value(),
         }
     }
 }
-
-// impl From<&Inline> for TokenType {
-//     fn from(inline: &Inline) -> Self {
-//         match *inline {
-//             Inline::Bold(_) => TokenType::Bold,
-//             Inline::Italic(_) => TokenType::Italic,
-//             Inline::Verbatim(_) => TokenType::Verbatim,
-//             _ => TokenType::Paragraph,
-//         }
-//     }
-// }
 
 impl From<&Inline> for OpenTokenModifier {
     fn from(inline: &Inline) -> Self {
@@ -189,10 +168,6 @@ impl From<&Inline> for OpenTokenModifier {
             },
             Inline::Italic(_) => OpenTokenModifier {
                 token_modifier: TokenModifier::Italic,
-                ..Default::default()
-            },
-            Inline::Verbatim(_) => OpenTokenModifier {
-                token_modifier: TokenModifier::Verbatim,
                 ..Default::default()
             },
             _ => OpenTokenModifier {

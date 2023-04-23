@@ -9,19 +9,6 @@ use super::{
     inline_tokens::SemanticInlineTokenizer, TokenValue,
 };
 
-// #[derive(Debug, Default, Clone)]
-// pub(crate) struct OpenTokenType {
-//     /// The open token type
-//     _token_type: TokenType,
-//     /// Column offset the content of this type starts.
-//     /// Needed for nested blocks.
-//     ///
-//     /// e.g. verbatim inside list
-//     start_column_offset: u32,
-//     /// The type length, or `None` if the type goes to end of line
-//     length: Option<u32>,
-// }
-
 #[derive(Default, Debug, Clone)]
 pub(crate) enum TokenType {
     #[default]
@@ -83,7 +70,7 @@ impl SemanticBlockTokenizer for Heading {
                 .collect(),
         );
 
-        dbg!(tokens)
+        tokens
     }
 }
 

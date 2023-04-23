@@ -9,7 +9,6 @@ use unimarkup_core::document::Document;
 use self::block_tokens::SemanticBlockTokenizer;
 
 mod block_tokens;
-mod delta_conversions;
 mod inline_tokens;
 
 trait TokenValue {
