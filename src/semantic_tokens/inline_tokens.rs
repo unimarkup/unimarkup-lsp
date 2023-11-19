@@ -105,7 +105,7 @@ impl SemanticInlineTokenizer for Inline {
             }
 
             Inline::TextBox(textbox) => {
-                // TODO: implement proper highlighting for link and parentheses
+                // TODO: implement proper highlighting for textbox
                 textbox.inner().as_slice().tokens(token_type, modifiers)
             }
             Inline::Hyperlink(hyperlink) => {
