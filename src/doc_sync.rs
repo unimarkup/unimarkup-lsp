@@ -1,21 +1,27 @@
+use std::collections::HashSet;
+
 use lsp_types::DidChangeTextDocumentParams;
 use lsp_types::DidOpenTextDocumentParams;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
-use unimarkup_core::config::Config;
-use unimarkup_core::config::OutputFormat;
-use unimarkup_core::document::Document;
+use unimarkup_core::commons::config::output::Output;
+use unimarkup_core::commons::config::output::OutputFormatKind;
+use unimarkup_core::commons::config::Config;
+use unimarkup_core::Unimarkup;
 
 pub(crate) struct DocChangeWorker;
 
 impl DocChangeWorker {
     pub(crate) fn init(
-        tx_um: Sender<Document>,
+        tx_um: Sender<Unimarkup>,
         rx_doc_open: Receiver<DidOpenTextDocumentParams>,
         rx_doc_change: Receiver<DidChangeTextDocumentParams>,
     ) {
         let config = Config {
-            out_formats: Some(vec![OutputFormat::Html]),
+            output: Output {
+                formats: HashSet::from_iter(vec![OutputFormatKind::Html]),
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -28,39 +34,37 @@ impl DocChangeWorker {
     }
 
     async fn doc_open_loop(
-        tx_um: Sender<Document>,
+        tx_um: Sender<Unimarkup>,
         mut rx_doc_open: Receiver<DidOpenTextDocumentParams>,
         mut config: Config,
     ) {
         loop {
             if let Some(opened_doc) = rx_doc_open.recv().await {
-                config.um_file = opened_doc.text_document.uri.to_file_path().unwrap();
+                config.input = opened_doc.text_document.uri.to_file_path().unwrap();
 
-                if let Ok(rendered_doc) = unimarkup_core::unimarkup::compile(
+                let rendered_doc = unimarkup_core::Unimarkup::parse(
                     &opened_doc.text_document.text.clone(),
                     config.clone(),
-                ) {
-                    let _ = tx_um.send(rendered_doc).await;
-                }
+                );
+                let _ = tx_um.send(rendered_doc).await;
             }
         }
     }
 
     async fn doc_change_loop(
-        tx_um: Sender<Document>,
+        tx_um: Sender<Unimarkup>,
         mut rx_doc_change: Receiver<DidChangeTextDocumentParams>,
         mut config: Config,
     ) {
         loop {
             if let Some(changes) = rx_doc_change.recv().await {
-                config.um_file = changes.text_document.uri.to_file_path().unwrap();
+                config.input = changes.text_document.uri.to_file_path().unwrap();
 
-                if let Ok(rendered_doc) = unimarkup_core::unimarkup::compile(
+                let rendered_doc = unimarkup_core::Unimarkup::parse(
                     &changes.content_changes[0].text.clone(),
                     config.clone(),
-                ) {
-                    let _ = tx_um.send(rendered_doc).await;
-                }
+                );
+                let _ = tx_um.send(rendered_doc).await;
             }
         }
     }

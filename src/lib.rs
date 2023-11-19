@@ -3,7 +3,7 @@ use std::error::Error;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
-use unimarkup_core::document::Document;
+use unimarkup_core::Unimarkup;
 
 use lsp_server::{Connection, Message, RequestId};
 use lsp_types::notification::DidOpenTextDocument;
@@ -61,12 +61,12 @@ async fn main_loop(
         semantic_tokens_supported = workspace_capabilities.semantic_tokens.is_some();
     }
 
-    let (tx_um, mut rx_um) = mpsc::channel::<Document>(10);
+    let (tx_um, mut rx_um) = mpsc::channel::<Unimarkup>(10);
     let (tx_doc_open, rx_doc_open) = mpsc::channel::<DidOpenTextDocumentParams>(10);
     let (tx_doc_change, rx_doc_change) = mpsc::channel::<DidChangeTextDocumentParams>(10);
     let (tx_shutdown, _rx_shutdown) = mpsc::channel::<bool>(10);
 
-    let parsed_documents: Arc<RwLock<HashMap<Url, Document>>> =
+    let parsed_um_files: Arc<RwLock<HashMap<Url, Unimarkup>>> =
         Arc::new(RwLock::new(HashMap::new()));
     let mut update_cnt = 0;
 
@@ -75,7 +75,7 @@ async fn main_loop(
     DocChangeWorker::init(tx_um, rx_doc_open, rx_doc_change);
 
     let conn2 = Arc::clone(&conn);
-    let mut ren_docs = Arc::clone(&parsed_documents);
+    let mut ren_docs = Arc::clone(&parsed_um_files);
     tokio::spawn(async move {
         loop {
             if let Some(um) = rx_um.recv().await {
@@ -107,7 +107,7 @@ async fn main_loop(
                     params,
                     file_path,
                 } => {
-                    let documents = parsed_documents.read().await;
+                    let documents = parsed_um_files.read().await;
                     let document = documents.get(&Url::from_file_path(file_path).unwrap());
 
                     let resp = get_semantic_tokens_response(id, params, document);
@@ -133,16 +133,16 @@ async fn main_loop(
 }
 
 async fn update_um_file(
-    um: Document,
+    um: Unimarkup,
     conn: &Connection,
-    rendered_documents: &mut Arc<RwLock<HashMap<Url, Document>>>,
+    rendered_documents: &mut Arc<RwLock<HashMap<Url, Unimarkup>>>,
     semantic_tokens_supported: bool,
     update_cnt: usize,
 ) -> Result<(), Box<dyn Error + Sync + Send>> {
-    let file_id = Url::from_file_path(um.config.um_file.clone()).unwrap();
+    let file_id = Url::from_file_path(um.get_document().config.input.clone()).unwrap();
     let rendered_content = RenderedContent {
         id: file_id.clone(),
-        content: um.html().body,
+        content: um.render_html()?.to_string(),
     };
 
     rendered_documents.write().await.insert(file_id, um);

@@ -1,18 +1,28 @@
 use lsp_types::SemanticToken;
 use unimarkup_core::{
-    document::Document,
-    elements::blocks::Block,
-    elements::{atomic::Heading, atomic::Paragraph, enclosed::Verbatim},
+    parser::{
+        document::Document,
+        elements::{
+            atomic::{Heading, Paragraph},
+            blocks::Block,
+            enclosed::VerbatimBlock,
+            indents::{BulletList, BulletListEntry},
+            BlockElement,
+        },
+    },
+    Unimarkup,
 };
 
 use super::{inline_tokens::SemanticInlineTokenizer, TokenValue};
 
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TokenType {
     #[default]
     Paragraph,
     Heading,
+    BulletListEntry,
     Verbatim,
+    Math,
 }
 
 impl TokenValue for TokenType {
@@ -20,13 +30,21 @@ impl TokenValue for TokenType {
         match self {
             TokenType::Paragraph => 2, //21,
             TokenType::Heading => 3,
+            TokenType::BulletListEntry => 3,
             TokenType::Verbatim => 18,
+            TokenType::Math => 3,
         }
     }
 }
 
 pub(crate) trait SemanticBlockTokenizer {
     fn tokens(&self) -> Vec<SemanticToken>;
+}
+
+impl SemanticBlockTokenizer for Unimarkup {
+    fn tokens(&self) -> Vec<SemanticToken> {
+        self.get_document().tokens()
+    }
 }
 
 impl SemanticBlockTokenizer for Document {
@@ -44,8 +62,16 @@ impl SemanticBlockTokenizer for Block {
         match self {
             Block::Heading(heading) => heading.tokens(),
             Block::Paragraph(paragraph) => paragraph.tokens(),
-            Block::Verbatim(verbatim) => verbatim.tokens(),
-            _ => todo!(),
+            Block::VerbatimBlock(verbatim) => verbatim.tokens(),
+            Block::Blankline(_) => vec![],
+            Block::BulletList(bullet_list) => bullet_list.tokens(),
+            Block::BulletListEntry(_) => {
+                debug_assert!(
+                    false,
+                    "Bullet list entries must only be handled inside a bullet list element."
+                );
+                vec![]
+            }
         }
     }
 }
@@ -53,18 +79,33 @@ impl SemanticBlockTokenizer for Block {
 impl SemanticBlockTokenizer for Heading {
     fn tokens(&self) -> Vec<SemanticToken> {
         let mut tokens = vec![SemanticToken {
-            delta_line: self.line_nr as u32,
-            delta_start: 1,
+            delta_line: self.start().line as u32,
+            delta_start: self.start().col_utf16 as u32,
             length: (u8::from(self.level)).into(),
             token_type: TokenType::Heading.value(),
             token_modifiers_bitset: 0,
         }];
 
+        // Multiline heading => add tokens for prefix
+        // Tokens are ordered at the end anyways, so it is ok that these are added out of order
+        let mut lines = self.end.line - self.start.line;
+        while lines > 0 {
+            tokens.push(SemanticToken {
+                delta_line: (self.start().line + lines) as u32,
+                delta_start: self.start().col_utf16 as u32,
+                length: (u8::from(self.level)).into(),
+                token_type: TokenType::Heading.value(),
+                token_modifiers_bitset: 0,
+            });
+
+            lines -= 1;
+        }
+
         tokens.append(
             &mut self
                 .content
                 .iter()
-                .flat_map(|inline| inline.tokens(&mut vec![]))
+                .flat_map(|inline| inline.tokens(TokenType::Paragraph, &mut vec![]))
                 .collect(),
         );
 
@@ -76,54 +117,60 @@ impl SemanticBlockTokenizer for Paragraph {
     fn tokens(&self) -> Vec<SemanticToken> {
         self.content
             .iter()
-            .flat_map(|inline| inline.tokens(&mut vec![]))
+            .flat_map(|inline| inline.tokens(TokenType::Paragraph, &mut vec![]))
             .collect()
     }
 }
 
-impl SemanticBlockTokenizer for Verbatim {
+impl SemanticBlockTokenizer for VerbatimBlock {
     fn tokens(&self) -> Vec<SemanticToken> {
-        //TODO: Change length after Verbatim contains needed information
+        // NOTE: Only keywords are highlighted, but not the inner content
         let mut tokens = vec![SemanticToken {
-            delta_line: self.line_nr as u32,
-            delta_start: 1,
-            length: 50,
+            delta_line: self.start().line as u32,
+            delta_start: self.start().col_utf16 as u32,
+            length: self.tick_len as u32,
             token_type: TokenType::Verbatim.value(),
             token_modifiers_bitset: 0,
         }];
 
-        let lines = self.content.lines();
-        for (i, line) in lines.enumerate() {
+        if !self.implicit_closed {
             tokens.push(SemanticToken {
-                delta_line: (self.line_nr + i + 1) as u32,
-                delta_start: 1,
-                length: (line.len() as u32),
+                delta_line: self.end().line as u32,
+                delta_start: self.start().col_utf16 as u32, // Start, because start & end ticks have same column offset
+                length: self.tick_len as u32,
                 token_type: TokenType::Verbatim.value(),
                 token_modifiers_bitset: 0,
             });
         }
 
-        tokens.push(SemanticToken {
-            delta_line: (self.line_nr + self.content.lines().count() + 1) as u32,
-            delta_start: 1,
-            length: 50,
-            token_type: TokenType::Verbatim.value(),
-            token_modifiers_bitset: 0,
-        });
+        tokens
+    }
+}
+
+impl SemanticBlockTokenizer for BulletList {
+    fn tokens(&self) -> Vec<SemanticToken> {
+        let mut tokens = Vec::new();
+
+        for entry in &self.entries {
+            tokens.append(&mut entry.tokens());
+        }
 
         tokens
     }
 }
 
-// fn calculate_column_offset(open_types: &mut [OpenTokenType]) -> u32 {
-//     match open_types.last() {
-//         Some(last_open) => {
-//             if let Some(length) = last_open.length {
-//                 length + last_open.start_column_offset
-//             } else {
-//                 last_open.start_column_offset
-//             }
-//         }
-//         None => 0,
-//     }
-// }
+impl SemanticBlockTokenizer for BulletListEntry {
+    fn tokens(&self) -> Vec<SemanticToken> {
+        let mut tokens = vec![SemanticToken {
+            delta_line: self.start().line as u32,
+            delta_start: self.start().col_utf16 as u32,
+            length: 1,
+            token_type: TokenType::BulletListEntry.value(),
+            token_modifiers_bitset: 0,
+        }];
+
+        tokens.append(&mut self.body.iter().flat_map(|block| block.tokens()).collect());
+
+        tokens
+    }
+}

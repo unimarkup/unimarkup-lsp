@@ -1,13 +1,13 @@
 use insta::assert_snapshot;
-use unimarkup_core::config::Config;
+use unimarkup_core::commons::config::Config;
 use unimarkup_lsp::semantic_tokens::get_semantic_tokens;
 
 #[test]
 fn heading_token_type() {
     let input = "# heading";
-    let document = unimarkup_core::unimarkup::compile(input, Config::default()).unwrap();
+    let um = unimarkup_core::Unimarkup::parse(input, Config::default());
 
-    let tokens = get_semantic_tokens(&document);
+    let tokens = get_semantic_tokens(&um);
 
     assert_snapshot!(format!("{:#?}", tokens));
 }
@@ -15,9 +15,9 @@ fn heading_token_type() {
 #[test]
 fn heading_token_type_with_bold_token_modifier() {
     let input = "# **heading**";
-    let document = unimarkup_core::unimarkup::compile(input, Config::default()).unwrap();
+    let um = unimarkup_core::Unimarkup::parse(input, Config::default());
 
-    let tokens = get_semantic_tokens(&document);
+    let tokens = get_semantic_tokens(&um);
 
     assert_snapshot!(format!("{:#?}", tokens));
 }

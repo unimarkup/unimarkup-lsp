@@ -4,7 +4,7 @@ use lsp_types::SemanticToken;
 use lsp_types::SemanticTokens;
 use lsp_types::SemanticTokensParams;
 use lsp_types::SemanticTokensResult;
-use unimarkup_core::document::Document;
+use unimarkup_core::Unimarkup;
 
 use self::block_tokens::SemanticBlockTokenizer;
 
@@ -18,19 +18,19 @@ trait TokenValue {
 pub fn get_semantic_tokens_response(
     id: RequestId,
     _params: SemanticTokensParams,
-    document: Option<&Document>,
+    um_opt: Option<&Unimarkup>,
 ) -> Response {
     let mut tokens = SemanticTokens {
         result_id: Some(id.to_string()),
         ..Default::default()
     };
 
-    if let Some(um_doc) = document {
-        tokens.data = get_semantic_tokens(um_doc);
+    if let Some(um) = um_opt {
+        tokens.data = get_semantic_tokens(um);
     }
 
     let result = Some(SemanticTokensResult::Tokens(tokens));
-    let result = serde_json::to_value(&result).unwrap();
+    let result = serde_json::to_value(result).unwrap();
     Response {
         id,
         result: Some(result),
@@ -38,8 +38,8 @@ pub fn get_semantic_tokens_response(
     }
 }
 
-pub fn get_semantic_tokens(document: &Document) -> Vec<SemanticToken> {
-    make_relative(document.tokens())
+pub fn get_semantic_tokens(um: &Unimarkup) -> Vec<SemanticToken> {
+    make_relative(um.tokens())
 }
 
 /// Brings all tokens in relative position offsets

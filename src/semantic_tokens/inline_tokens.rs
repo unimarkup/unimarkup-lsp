@@ -1,27 +1,31 @@
 use lsp_types::SemanticToken;
-use unimarkup_inline::{Inline, NestedContent, TokenDelimiters, TokenKind};
+use unimarkup_inline::{
+    element::{
+        base::{EscapedPlain, EscapedWhitespace, Plain},
+        formatting::{
+            Bold, Highlight, Italic, Math, Overline, Quote, Strikethrough, Subscript, Superscript,
+            Underline, Verbatim,
+        },
+        Inline, InlineElement,
+    },
+    InlineTokenKind,
+};
 
 use super::{block_tokens::TokenType, TokenValue};
 
-#[derive(Debug, Default, Clone)]
-pub(crate) struct OpenTokenModifier {
-    /// The open token modifier
-    token_modifier: TokenModifier,
-    /// Column start of the modifier
-    _start_column: u32,
-    /// Column offset the content of this modifier starts.
-    /// Needed for nested blocks.
-    ///
-    /// e.g. verbatim inside list
-    _start_column_offset: u32,
-}
-
-#[derive(Default, Debug, Clone)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TokenModifier {
     #[default]
     Plain,
     Bold,
+    Highlight,
     Italic,
+    Overline,
+    Quote,
+    Strikethrough,
+    Subscript,
+    Superscript,
+    Underline,
 }
 
 impl TokenValue for TokenModifier {
@@ -30,149 +34,238 @@ impl TokenValue for TokenModifier {
         match self {
             TokenModifier::Plain => 0,
             TokenModifier::Bold => 1,
-            TokenModifier::Italic => 1 << 1,
+            TokenModifier::Highlight => 1 << 1,
+            TokenModifier::Italic => 1 << 2,
+            TokenModifier::Overline => 1 << 3,
+            TokenModifier::Quote => 1 << 4,
+            TokenModifier::Strikethrough => 1 << 5,
+            TokenModifier::Subscript => 1 << 6,
+            TokenModifier::Superscript => 1 << 7,
+            TokenModifier::Underline => 1 << 8,
         }
     }
 }
 
 pub(crate) trait SemanticInlineTokenizer {
-    fn tokens(&self, open_modifiers: &mut Vec<OpenTokenModifier>) -> Vec<SemanticToken>;
+    fn tokens(
+        &self,
+        token_type: TokenType,
+        modifiers: &mut Vec<TokenModifier>,
+    ) -> Vec<SemanticToken>;
 }
 
-impl SemanticInlineTokenizer for NestedContent {
-    fn tokens(&self, open_modifiers: &mut Vec<OpenTokenModifier>) -> Vec<SemanticToken> {
+impl SemanticInlineTokenizer for &[Inline] {
+    fn tokens(
+        &self,
+        token_type: TokenType,
+        modifiers: &mut Vec<TokenModifier>,
+    ) -> Vec<SemanticToken> {
         self.iter()
-            .flat_map(|inline| inline.tokens(open_modifiers))
+            .flat_map(|inline| inline.tokens(token_type, modifiers))
             .collect()
     }
 }
 
 impl SemanticInlineTokenizer for Inline {
-    fn tokens(&self, open_modifiers: &mut Vec<OpenTokenModifier>) -> Vec<SemanticToken> {
+    fn tokens(
+        &self,
+        token_type: TokenType,
+        modifiers: &mut Vec<TokenModifier>,
+    ) -> Vec<SemanticToken> {
         match self {
-            Inline::Bold(nested) | Inline::Italic(nested) => {
-                open_modifiers.push(self.into());
-                let delimiters = self.delimiters();
+            Inline::Bold(format) => format.tokens(token_type, modifiers),
+            Inline::Italic(format) => format.tokens(token_type, modifiers),
+            Inline::Underline(format) => format.tokens(token_type, modifiers),
+            Inline::Subscript(format) => format.tokens(token_type, modifiers),
+            Inline::Superscript(format) => format.tokens(token_type, modifiers),
+            Inline::Overline(format) => format.tokens(token_type, modifiers),
+            Inline::Strikethrough(format) => format.tokens(token_type, modifiers),
+            Inline::Highlight(format) => format.tokens(token_type, modifiers),
+            Inline::Quote(format) => format.tokens(token_type, modifiers),
 
-                let mut tokens = vec![SemanticToken {
-                    delta_line: self.span().start().line as u32,
-                    delta_start: self.span().start().column as u32,
-                    length: delimiters.open().as_str().len() as u32,
-                    token_type: TokenType::default().value(),
-                    token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
-                }];
+            Inline::Verbatim(verbatim) => verbatim.tokens(TokenType::Verbatim, modifiers),
+            Inline::Math(math) => math.tokens(TokenType::Math, modifiers),
 
-                tokens.append(&mut nested.tokens(open_modifiers));
-
-                let closing_delim = delimiters
-                    .close()
-                    .expect("Could not unwrap non-existent closing tag");
-
-                tokens.push(SemanticToken {
-                    delta_line: self.span().end().line as u32,
-                    delta_start: (self.span().end().column + 1 - closing_delim.as_str().len())
-                        as u32,
-                    length: closing_delim.as_str().len() as u32,
-                    token_type: TokenType::default().value(),
-                    token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
-                });
-
-                open_modifiers.pop();
-                tokens
-            }
-            Inline::Verbatim(plain_content) => {
-                vec![SemanticToken {
-                    delta_line: plain_content.span().start().line as u32,
-                    delta_start: plain_content.span().start().column as u32,
-                    length: (plain_content.content_len() + 2) as u32, // +2 for delimiters
-                    token_type: TokenType::Verbatim.value(),
-                    token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
-                }]
-            }
-            Inline::Plain(plain_content) => {
-                if !open_modifiers.is_empty() {
-                    vec![SemanticToken {
-                        delta_line: plain_content.span().start().line as u32,
-                        delta_start: plain_content.span().start().column as u32,
-                        length: plain_content.content_len() as u32,
-                        token_type: TokenType::default().value(),
-                        token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
-                    }]
-                } else {
+            Inline::Plain(plain) => plain.tokens(token_type, modifiers),
+            Inline::EscapedPlain(plain) => plain.tokens(token_type, modifiers),
+            Inline::EscapedWhitespace(plain) => plain.tokens(token_type, modifiers),
+            Inline::EscapedNewline(escaped_newline) => {
+                if modifiers.is_empty() && token_type == TokenType::default() {
                     vec![]
+                } else {
+                    vec![SemanticToken {
+                        delta_line: escaped_newline.start().line as u32,
+                        delta_start: escaped_newline.start().col_utf16 as u32,
+                        // To highlight the backslash
+                        length: 1,
+                        token_type: token_type.value(),
+                        token_modifiers_bitset: get_modifier_bitfield(modifiers),
+                    }]
                 }
             }
-            Inline::TextGroup(nested) => {
-                let delimiters: TokenDelimiters = self.delimiters();
 
-                let mut tokens = vec![SemanticToken {
-                    delta_line: nested.span().start().line as u32,
-                    delta_start: nested.span().start().column as u32,
-                    length: delimiters.open().as_str().len() as u32,
-                    token_type: TokenType::default().value(),
-                    token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
-                }];
-
-                tokens.append(&mut nested.tokens(open_modifiers));
-
-                tokens.push(SemanticToken {
-                    delta_line: nested.span().end().line as u32,
-                    delta_start: (nested.span().end().column
-                        - delimiters
-                            .close()
-                            .unwrap_or(TokenKind::Plain)
-                            .as_str()
-                            .len()) as u32,
-                    length: delimiters
-                        .close()
-                        .unwrap_or(TokenKind::Plain)
-                        .as_str()
-                        .len() as u32,
-                    token_type: TokenType::default().value(),
-                    token_modifiers_bitset: get_modifier_bitfield(open_modifiers),
-                });
-
-                tokens
+            Inline::TextBox(textbox) => {
+                // TODO: implement proper highlighting for link and parentheses
+                textbox.inner().as_slice().tokens(token_type, modifiers)
             }
-            _ => vec![],
+            Inline::Hyperlink(hyperlink) => {
+                // TODO: implement proper highlighting for link and parentheses
+                hyperlink.inner().as_slice().tokens(token_type, modifiers)
+            }
+
+            Inline::Newline(_) | Inline::ImplicitNewline(_) => vec![],
+
+            Inline::ImplicitSubstitution(_) => todo!(),
+            Inline::DirectUri(_) => todo!(),
+            Inline::NamedSubstitution(_) => todo!(),
         }
     }
 }
 
-impl TokenValue for Inline {
-    fn value(&self) -> u32 {
-        match self {
-            Inline::Bold(_) => TokenModifier::Bold.value(),
-            Inline::Italic(_) => TokenModifier::Italic.value(),
-            _ => TokenModifier::default().value(),
-        }
-    }
-}
-
-impl From<&Inline> for OpenTokenModifier {
-    fn from(inline: &Inline) -> Self {
-        match inline {
-            Inline::Bold(_) => OpenTokenModifier {
-                token_modifier: TokenModifier::Bold,
-                ..Default::default()
-            },
-            Inline::Italic(_) => OpenTokenModifier {
-                token_modifier: TokenModifier::Italic,
-                ..Default::default()
-            },
-            _ => OpenTokenModifier {
-                ..Default::default()
-            },
-        }
-    }
-}
-
-fn get_modifier_bitfield(modifiers: &Vec<OpenTokenModifier>) -> u32 {
+fn get_modifier_bitfield(modifiers: &Vec<TokenModifier>) -> u32 {
     let mut field = 0;
 
     for modifier in modifiers {
-        field |= modifier.token_modifier.value();
+        field |= modifier.value();
     }
 
     field
 }
+
+trait InlineFormat: InlineElement {
+    fn keyword_len(&self) -> u32;
+    fn implicit_end(&self) -> bool;
+    fn inner(&self) -> &[Inline];
+    fn modifier(&self) -> TokenModifier;
+}
+
+impl<T> SemanticInlineTokenizer for T
+where
+    T: InlineFormat,
+{
+    fn tokens(
+        &self,
+        token_type: TokenType,
+        modifiers: &mut Vec<TokenModifier>,
+    ) -> Vec<SemanticToken> {
+        modifiers.push(self.modifier());
+
+        let mut tokens = vec![SemanticToken {
+            delta_line: self.start().line as u32,
+            delta_start: self.start().col_utf16 as u32,
+            length: self.keyword_len(),
+            token_type: token_type.value(),
+            token_modifiers_bitset: get_modifier_bitfield(modifiers),
+        }];
+
+        tokens.append(&mut self.inner().tokens(token_type, modifiers));
+
+        if !self.implicit_end() {
+            tokens.push(SemanticToken {
+                delta_line: self.end().line as u32,
+                delta_start: (self.end().col_utf16 as u32 - self.keyword_len()),
+                length: self.keyword_len(),
+                token_type: token_type.value(),
+                token_modifiers_bitset: get_modifier_bitfield(modifiers),
+            });
+        }
+
+        modifiers.pop();
+        tokens
+    }
+}
+
+macro_rules! impl_inline_format {
+    ($($format:ident),+) => {
+        $(
+            impl InlineFormat for $format {
+                fn keyword_len(&self) -> u32 {
+                    unimarkup_inline::InlineTokenKind::$format.len() as u32
+                }
+
+                fn implicit_end(&self) -> bool {
+                    self.implicit_end()
+                }
+
+                fn inner(&self) -> &[Inline] {
+                    self.inner()
+                }
+
+                fn modifier(&self) -> TokenModifier {
+                    TokenModifier::$format
+                }
+            }
+        )+
+    };
+}
+
+impl_inline_format!(
+    Bold,
+    Highlight,
+    Italic,
+    Overline,
+    Quote,
+    Strikethrough,
+    Subscript,
+    Superscript,
+    Underline
+);
+
+macro_rules! scoped_format_tokens {
+    ($($scoped:ident),+) => {
+        $(
+            impl SemanticInlineTokenizer for $scoped {
+                fn tokens(&self, token_type: TokenType, modifiers: &mut Vec<TokenModifier>) -> Vec<SemanticToken> {
+                    let mut tokens = vec![SemanticToken {
+                        delta_line: self.start().line as u32,
+                        delta_start: self.start().col_utf16 as u32,
+                        length: InlineTokenKind::$scoped.len() as u32,
+                        token_type: token_type.value(),
+                        token_modifiers_bitset: get_modifier_bitfield(modifiers),
+                    }];
+
+                    tokens.append(&mut self.inner().as_slice().tokens(token_type, modifiers));
+
+                    if !self.implicit_end() {
+                        tokens.push(SemanticToken {
+                            delta_line: self.end().line as u32,
+                            delta_start: (self.end().col_utf16 - InlineTokenKind::$scoped.len()) as u32,
+                            length: InlineTokenKind::$scoped.len() as u32,
+                            token_type: token_type.value(),
+                            token_modifiers_bitset: get_modifier_bitfield(modifiers),
+                        });
+                    }
+
+                    tokens
+                }
+            }
+        )+
+    }
+}
+
+scoped_format_tokens!(Verbatim, Math);
+
+macro_rules! plain_tokens {
+    ($($plain:ident),+) => {
+        $(
+            impl SemanticInlineTokenizer for $plain {
+                fn tokens(&self, token_type: TokenType, modifiers: &mut Vec<TokenModifier>) -> Vec<SemanticToken> {
+                    if modifiers.is_empty() && token_type == TokenType::default() {
+                        vec![]
+                    } else {
+                        vec![SemanticToken {
+                            delta_line: self.start().line as u32,
+                            delta_start: self.start().col_utf16 as u32,
+                            // Works, because plain elements never span across multiple lines
+                            length: (self.end().col_utf16 - self.start().col_utf16) as u32,
+                            token_type: token_type.value(),
+                            token_modifiers_bitset: get_modifier_bitfield(modifiers),
+                        }]
+                    }
+                }
+            }
+        )+
+    }
+}
+
+plain_tokens!(Plain, EscapedPlain, EscapedWhitespace);

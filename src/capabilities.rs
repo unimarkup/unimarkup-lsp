@@ -46,15 +46,15 @@ fn create_semantic_token_legend() -> SemanticTokensLegend {
             SemanticTokenType::OPERATOR,
         ],
         token_modifiers: vec![
-            SemanticTokenModifier::DECLARATION,
-            SemanticTokenModifier::DEFINITION,
-            SemanticTokenModifier::READONLY,
-            SemanticTokenModifier::STATIC,
-            SemanticTokenModifier::DEPRECATED,
-            SemanticTokenModifier::ABSTRACT,
-            SemanticTokenModifier::ASYNC,
-            SemanticTokenModifier::MODIFICATION,
-            SemanticTokenModifier::DOCUMENTATION,
+            SemanticTokenModifier::DECLARATION,   // Bold
+            SemanticTokenModifier::DEFINITION,    // Highlight
+            SemanticTokenModifier::READONLY,      // Italic
+            SemanticTokenModifier::STATIC,        // Overline
+            SemanticTokenModifier::DEPRECATED,    // Quote
+            SemanticTokenModifier::ABSTRACT,      // Strikethrough
+            SemanticTokenModifier::ASYNC,         // Subscript
+            SemanticTokenModifier::MODIFICATION,  // Superscript
+            SemanticTokenModifier::DOCUMENTATION, // Underline
             SemanticTokenModifier::DEFAULT_LIBRARY,
         ],
     }
