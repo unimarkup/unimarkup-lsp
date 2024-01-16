@@ -3,8 +3,8 @@ use unimarkup_inline::{
     element::{
         base::{EscapedPlain, EscapedWhitespace, Plain},
         formatting::{
-            Bold, Highlight, Italic, Math, Overline, Quote, Strikethrough, Subscript, Superscript,
-            Underline, Verbatim,
+            Bold, DoubleQuote, Highlight, Italic, Math, Overline, Strikethrough, Subscript,
+            Superscript, Underline, Verbatim,
         },
         Inline, InlineElement,
     },
@@ -21,7 +21,7 @@ pub(crate) enum TokenModifier {
     Highlight,
     Italic,
     Overline,
-    Quote,
+    DoubleQuote,
     Strikethrough,
     Subscript,
     Superscript,
@@ -37,7 +37,7 @@ impl TokenValue for TokenModifier {
             TokenModifier::Highlight => 1 << 1,
             TokenModifier::Italic => 1 << 2,
             TokenModifier::Overline => 1 << 3,
-            TokenModifier::Quote => 1 << 4,
+            TokenModifier::DoubleQuote => 1 << 4,
             TokenModifier::Strikethrough => 1 << 5,
             TokenModifier::Subscript => 1 << 6,
             TokenModifier::Superscript => 1 << 7,
@@ -81,7 +81,7 @@ impl SemanticInlineTokenizer for Inline {
             Inline::Overline(format) => format.tokens(token_type, modifiers),
             Inline::Strikethrough(format) => format.tokens(token_type, modifiers),
             Inline::Highlight(format) => format.tokens(token_type, modifiers),
-            Inline::Quote(format) => format.tokens(token_type, modifiers),
+            Inline::DoubleQuote(format) => format.tokens(token_type, modifiers),
 
             Inline::Verbatim(verbatim) => verbatim.tokens(TokenType::Verbatim, modifiers),
             Inline::Math(math) => math.tokens(TokenType::Math, modifiers),
@@ -175,6 +175,25 @@ where
     }
 }
 
+impl InlineFormat for DoubleQuote {
+    fn keyword_len(&self) -> u32 {
+        // Because quote formatting has two double quotes
+        (unimarkup_inline::InlineTokenKind::DoubleQuote.len() * 2) as u32
+    }
+
+    fn implicit_end(&self) -> bool {
+        self.implicit_end()
+    }
+
+    fn inner(&self) -> &[Inline] {
+        self.inner()
+    }
+
+    fn modifier(&self) -> TokenModifier {
+        TokenModifier::DoubleQuote
+    }
+}
+
 macro_rules! impl_inline_format {
     ($($format:ident),+) => {
         $(
@@ -204,7 +223,6 @@ impl_inline_format!(
     Highlight,
     Italic,
     Overline,
-    Quote,
     Strikethrough,
     Subscript,
     Superscript,
